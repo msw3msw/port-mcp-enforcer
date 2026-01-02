@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — Executor (SKELETON)
+ * Port-MCP Enforcer — Executor
  * Location: src/executor/index.js
  *
  * Responsibility:
@@ -9,7 +9,6 @@
  * HARD RULES:
  * - Requires explicit --apply
  * - NO implicit execution
- * - NO background jobs
  * ============================================================================
  */
 
@@ -18,6 +17,7 @@
 const loadPlan = require("./plan-loader");
 const preflight = require("./preflight");
 const confirm = require("./confirm");
+const actions = require("./actions");
 
 module.exports = async function runExecutor(opts = {}) {
     if (!opts.apply) {
@@ -42,18 +42,33 @@ module.exports = async function runExecutor(opts = {}) {
         }
     }
 
-    console.log("\n=== Executor (SKELETON) ===");
-    console.log("No actions have been executed.");
-    console.log("The following actions WOULD be applied:\n");
+    console.log("\n=== Executing Plan ===\n");
 
-    plan.actions.forEach((a, i) => {
-        console.log(
-            `${i + 1}. ${a.type} → ${a.container} (${a.reason || "no reason"})`
-        );
-    });
+    const results = [];
+
+    for (const action of plan.actions) {
+        const handler = actions[action.type];
+
+        if (!handler) {
+            throw new Error(`No executor handler for action: ${action.type}`);
+        }
+
+        console.log(`→ Executing ${action.type} for ${action.container}`);
+
+        const res = await handler(action, {
+            baseUrl: opts.baseUrl,
+            dryRun: opts.dryRun
+        });
+
+        results.push({
+            action: action.type,
+            container: action.container,
+            result: res
+        });
+    }
 
     return {
-        status: "dry-skeleton",
-        actions: plan.actions.length
+        status: "success",
+        results
     };
 };
