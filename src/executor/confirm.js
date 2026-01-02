@@ -5,6 +5,7 @@
  *
  * Responsibility:
  * - Explicit user approval before mutation
+ * - Separate gate for Docker downtime
  * ============================================================================
  */
 
@@ -12,7 +13,21 @@
 
 const readline = require("readline");
 
-module.exports = async function confirm(plan) {
+function ask(prompt) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    return new Promise(resolve => {
+        rl.question(prompt, answer => {
+            rl.close();
+            resolve(answer.trim());
+        });
+    });
+}
+
+async function confirmApply(plan) {
     console.log("\nYou are about to APPLY the following actions:\n");
 
     plan.actions.forEach((a, i) => {
@@ -24,15 +39,23 @@ module.exports = async function confirm(plan) {
         'Type "APPLY" to continue:'
     );
 
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
+    const answer = await ask("> ");
+    return answer === "APPLY";
+}
 
-    return new Promise(resolve => {
-        rl.question("> ", answer => {
-            rl.close();
-            resolve(answer.trim() === "APPLY");
-        });
-    });
+async function confirmDockerDowntime() {
+    console.log(
+        "\nWARNING: Docker mutation will STOP and RESTART containers.\n" +
+        "Downtime is expected. Rollback is manual.\n\n" +
+        "Type EXACTLY the following to continue:\n\n" +
+        "I UNDERSTAND THIS WILL CAUSE DOWNTIME\n"
+    );
+
+    const answer = await ask("> ");
+    return answer === "I UNDERSTAND THIS WILL CAUSE DOWNTIME";
+}
+
+module.exports = {
+    confirmApply,
+    confirmDockerDowntime
 };
