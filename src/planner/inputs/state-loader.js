@@ -1,12 +1,12 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — State Loader
+ * Port-MCP Enforcer — State Loader (FINAL)
  * Location: src/planner/inputs/state-loader.js
  *
  * Responsibility:
  * - Fetch authoritative state from Port-MCP
- * - Validate MCP contract envelopes (loosely)
- * - Normalize into planner-safe structures
+ * - Normalize containers, ports, and networks
+ * - Guarantee planner/UI-safe contracts
  * ============================================================================
  */
 
@@ -48,17 +48,49 @@ async function loadState(options = {}) {
     }
 
     /* ============================
+       CONTAINER NORMALIZATION
+    ============================ */
+
+    const containers = containersRes.containers.map(c => ({
+        id: c.id,
+        name: c.name,
+        image: c.image || null,
+        state: c.state || null,
+        running: Boolean(c.running),
+
+        // Guaranteed arrays
+        ports: Array.isArray(c.ports) ? c.ports : [],
+        networks: Array.isArray(c.networks)
+            ? c.networks.map(n => ({
+                  name: n.name,
+                  ip: n.ip || null,
+                  gateway: n.gateway || null
+              }))
+            : []
+    }));
+
+    /* ============================
+       PORT NORMALIZATION (HOST VIEW)
+    ============================ */
+
+    const ports = portsRes.ports.map(p => ({
+        container: p.containerName || null,
+        containerId: p.containerId || null,
+        host: Number(p.host),
+        containerPort: Number(p.container),
+        protocol: p.protocol || "tcp"
+    }));
+
+    /* ============================
        REGISTRY NORMALIZATION
     ============================ */
 
     let registryEntries = null;
 
-    // Case 1: raw array
     if (Array.isArray(registryRes)) {
         registryEntries = registryRes;
     }
 
-    // Case 2: known envelopes
     if (!registryEntries && Array.isArray(registryRes?.registry)) {
         registryEntries = registryRes.registry;
     }
@@ -67,7 +99,6 @@ async function loadState(options = {}) {
         registryEntries = registryRes.entries;
     }
 
-    // Case 3: defensive discovery (authoritative)
     if (!registryEntries && registryRes && typeof registryRes === "object") {
         for (const value of Object.values(registryRes)) {
             if (Array.isArray(value)) {
@@ -82,14 +113,14 @@ async function loadState(options = {}) {
     }
 
     /* ============================
-       NORMALIZED STATE
+       FINAL STATE
     ============================ */
 
     return {
         fetchedAt: Date.now(),
 
-        containers: containersRes.containers,
-        ports: portsRes.ports,
+        containers,
+        ports,
         networks: networksRes.networks,
         registry: registryEntries
     };

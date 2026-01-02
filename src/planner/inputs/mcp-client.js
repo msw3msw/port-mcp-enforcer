@@ -1,19 +1,42 @@
-function createMcpClient(config) {
+/**
+ * ============================================================================
+ * Port-MCP Enforcer — MCP Client (Fetch-based)
+ * Location: src/planner/inputs/mcp-client.js
+ *
+ * Responsibility:
+ * - Read-only Port-MCP access
+ * - Match state-loader contract
+ * ============================================================================
+ */
+
+"use strict";
+
+function createMcpClient({ baseUrl }) {
+    const API_BASE = `${baseUrl}/api/v1`;
+
+    async function get(path) {
+        const res = await fetch(`${API_BASE}${path}`);
+        if (!res.ok) {
+            throw new Error(`Port-MCP ${path} failed (${res.status})`);
+        }
+        return res.json();
+    }
+
     return {
-        getContainers: async () => {
-            throw new Error("getContainers not implemented");
+        getContainers() {
+            return get("/containers");
         },
-        getPorts: async () => {
-            throw new Error("getPorts not implemented");
+
+        getPorts() {
+            return get("/ports");
         },
-        getNetworks: async () => {
-            throw new Error("getNetworks not implemented");
+
+        getNetworks() {
+            return get("/networks");
         },
-        getRegistry: async () => {
-            throw new Error("getRegistry not implemented");
-        },
-        getPolicy: async () => {
-            throw new Error("getPolicy not implemented");
+
+        getRegistry() {
+            return get("/registry");
         }
     };
 }
