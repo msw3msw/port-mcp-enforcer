@@ -16,6 +16,12 @@ module.exports = async function runExecutor(opts = {}) {
     }
 
     const plan = await loadPlan(opts);
+
+    // IMPORTANT: inherit dryRun from plan if not explicitly supplied
+    if (opts.dryRun === undefined && plan && plan.dryRun === true) {
+        opts.dryRun = true;
+    }
+
     await preflight(plan);
 
     if (!opts.yes) {
