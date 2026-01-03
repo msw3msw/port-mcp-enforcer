@@ -1,176 +1,261 @@
+/**
+ * ============================================================================
+ * Port-MCP Enforcer â€” Web UI Controller
+ * Location: src/ui/web/public/app.js
+ *
+ * Responsibility:
+ * - Orchestrate Scan â†’ Plan â†’ Apply
+ * - Wire UI helpers
+ *
+ * HARD RULES:
+ * - UI only
+ * - No planner logic
+ * - No silent refactors
+ * ============================================================================
+ */
+
 "use strict";
 
 const HOST_IP = "192.168.0.100";
-const LOW_CONFIDENCE = 0.4;
 const CONFIRM_PHRASE = "I UNDERSTAND THIS WILL CAUSE DOWNTIME";
+const CONF_OVERRIDE_THRESHOLD = 0.9;
 
 let lastScanData = null;
-let isExecuting = false;
-let lastExecutionResult = null;
-let activeJobId = null;
-let eventSource = null;
+let lastPlanData = null;
+let lastExecutionJobs = new Map(); // Track completed jobs for history tab
 
-/**
- * UI-only, per-session category overrides.
- */
-const categoryOverrides = {};
+let isExecuting = false;
+let activeJobId = null;
+let lastExecutionJob = null;
+let liveEvents = [];
 
 /* ============================================================================
-   Scan + render
+   STEP 4C â€” Policy Enforcement Intent (UI-only, non-executing)
+============================================================================ */
+
+window.__policyEnforcementIntent = window.__policyEnforcementIntent || {};
+
+window.PolicyEnforcementUI = {
+    getIntent() {
+        return window.__policyEnforcementIntent || {};
+    },
+    isEnforced(containerName) {
+        return window.__policyEnforcementIntent?.[containerName] === true;
+    },
+    set(containerName, enabled) {
+        if (!containerName) return;
+        if (enabled) window.__policyEnforcementIntent[containerName] = true;
+        else delete window.__policyEnforcementIntent[containerName];
+        plan().catch(() => {});
+    },
+    clearAll() {
+        window.__policyEnforcementIntent = {};
+        plan().catch(() => {});
+    },
+    count() {
+        return Object.keys(window.__policyEnforcementIntent || {}).length;
+    }
+};
+
+window.setPolicyEnforcementIntent = (name, enabled) =>
+    window.PolicyEnforcementUI.set(name, enabled);
+window.clearPolicyEnforcementIntent = () =>
+    window.PolicyEnforcementUI.clearAll();
+
+/* ============================================================================
+   Scan â†’ Plan â†’ Render
 ============================================================================ */
 
 async function scan() {
+    await CategoryOverridesUI.loadPersistedOverrides();
+
     const out = document.getElementById("output");
-    out.textContent = "Scanning Docker...";
+    if (out) out.textContent = "Scanning Docker...";
 
     const res = await fetch("/api/scan");
-    const data = await res.json();
+    lastScanData = await res.json();
 
-    lastScanData = data;
-    renderTable();
+    // Also fetch recent jobs for history tab
+    await fetchRecentJobs();
+
+    await plan();
 }
 
-function renderTable() {
-    if (!lastScanData) {
-        document.getElementById("output").textContent = "No scan data.";
+async function fetchRecentJobs() {
+    try {
+        // This endpoint would need to be added to server.js
+        // For now, we'll track jobs from apply operations
+        // In a real implementation, server would expose GET /api/jobs endpoint
+    } catch (err) {
+        console.log('Could not fetch job history:', err);
+    }
+}
+
+async function plan() {
+    const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            categoryOverrides: CategoryOverridesUI.categoryOverrides,
+            policyEnforcement: window.__policyEnforcementIntent
+        })
+    });
+
+    lastPlanData = await res.json();
+    render();
+}
+
+/* ============================================================================
+   Render
+============================================================================ */
+
+function render() {
+    const out = document.getElementById("output");
+    if (!out || !lastScanData || !lastPlanData) {
+        if (out) out.textContent = "No data.";
         return;
     }
 
-    const data = lastScanData;
-    const containers = data.classification?.containers || [];
-    const actions = data.plan?.actions || [];
-    const stateContainers = data.state?.containers || [];
+    const containers = lastScanData.containers.map(c => ({
+        name: c.name || c.container || c.id || "(unknown)",
+        category: lastPlanData.classification?.[c.name]?.category || "unknown",
+        confidence: lastPlanData.classification?.[c.name]?.confidence ?? null,
+        _raw: c
+    }));
+
+    const planObj = lastPlanData.plan || {};
+    const actions = Array.isArray(planObj.actions) ? planObj.actions : [];
 
     const actionsByContainer = {};
     for (const a of actions) {
-        if (!actionsByContainer[a.container]) {
-            actionsByContainer[a.container] = [];
-        }
-        actionsByContainer[a.container].push(a);
+        if (!a?.container) continue;
+        (actionsByContainer[a.container] ||= []).push(a);
     }
 
     const portsByContainer = {};
-    const ports = data.state?.ports || [];
-    for (const p of ports) {
-        if (!portsByContainer[p.container]) {
-            portsByContainer[p.container] = [];
+    for (const p of lastScanData.ports || []) {
+        if (!p?.container) continue;
+        (portsByContainer[p.container] ||= []).push(p);
+    }
+
+    // Render tab bar
+    const tabBar = window.TabsUI ? window.TabsUI.renderTabBar() : '';
+    
+    // Render content based on active tab
+    let content = '';
+    
+    if (!window.TabsUI || window.TabsUI.currentTab === 'overview') {
+        // OVERVIEW TAB - Existing container table
+        const leftHtml = RenderTableUI.renderContainersTable({
+            containers,
+            portsByContainer,
+            actionsByContainer,
+            categoryOverrides: CategoryOverridesUI.categoryOverrides,
+            isExecuting,
+            CONF_OVERRIDE_THRESHOLD,
+            plan: planObj,
+            renderPorts,
+            openConfidenceOverride: CategoryOverridesUI.openCategoryOverride
+        });
+
+        /* ============================
+           Apply button gating + reason
+        ============================ */
+
+        // Get selected container names
+        const selectedContainers = new Set(
+            Object.keys(window.__policyEnforcementIntent || {}).filter(
+                k => window.__policyEnforcementIntent[k] === true
+            )
+        );
+
+        // Only check executable/blocking status for SELECTED containers
+        const selectedActions = actions.filter(a => 
+            selectedContainers.has(a.container)
+        );
+
+        const hasExecutable = selectedActions.some(a => a.executable === true);
+        const hasBlockingManual = selectedActions.some(
+            a => a.executable === false && a.type !== "no-op"
+        );
+
+        let applyDisabled = false;
+        let applyTitle = "";
+
+        if (isExecuting) {
+            applyDisabled = true;
+            applyTitle = "Execution in progress";
+        } else if (selectedContainers.size === 0) {
+            applyDisabled = true;
+            applyTitle = "No containers selected for enforcement";
+        } else if (!hasExecutable) {
+            applyDisabled = true;
+            applyTitle = "Selected containers have no executable actions";
+        } else if (hasBlockingManual) {
+            applyDisabled = true;
+            applyTitle =
+                "Apply disabled: selected containers require manual review";
         }
-        portsByContainer[p.container].push(p);
-    }
 
-    const networksByContainer = {};
-    for (const c of stateContainers) {
-        networksByContainer[c.name] = Array.isArray(c.networks)
-            ? c.networks
-            : [];
-    }
+        const enforcementCount = PolicyEnforcementUI.count();
 
-    let html = `
-<table border="1" cellpadding="6" cellspacing="0">
-<thead>
-<tr>
-  <th>Apply</th>
-  <th>Container</th>
-  <th>Category</th>
-  <th>Confidence</th>
-  <th>Ports</th>
-  <th>Networks</th>
-  <th>Status</th>
-</tr>
-</thead>
-<tbody>
-`;
+        const rightHtml = `
+<div class="panel">
+  <h3>Execution Gates</h3>
+  <div class="gates">
+    <label><input type="checkbox" id="dryRunOnly"> Dry-run only</label>
+    <label><input type="checkbox" id="allowMutation"> Apply planned changes</label>
+    <input type="text" id="confirmText" placeholder="${CONFIRM_PHRASE}" size="36">
+  </div>
 
-    for (const c of containers) {
-        const name = c.name;
-        const effectiveCategory = categoryOverrides[name] || c.category;
-        const effectiveConfidence =
-            categoryOverrides[name] ? 1.0 : c.confidence;
+  ${selectedContainers.size > 0 ? `
+  <div style="margin: 12px 0; padding: 12px; background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 6px; font-size: 12px;">
+    <strong style="color: #58a6ff;">Ready to execute:</strong>
+    <div style="margin-top: 6px;">
+      ${Array.from(selectedContainers).map(name => `
+        <div style="color: #e6edf3; margin: 2px 0;">• ${name}</div>
+      `).join('')}
+    </div>
+  </div>
+  ` : ''}
 
-        const containerActions = actionsByContainer[name] || [];
-        const containerPorts = portsByContainer[name] || [];
-        const containerNetworks = networksByContainer[name] || [];
-
-        const hasPlan = containerActions.length > 0;
-
-        const checkbox =
-            hasPlan && !isExecuting
-                ? `<input type="checkbox"
-                           class="apply-box"
-                           data-container="${name}">`
-                : "";
-
-        html += `
-<tr>
-  <td align="center">${checkbox}</td>
-  <td>${name}</td>
-  <td>${effectiveCategory}</td>
-  <td>${effectiveConfidence.toFixed(2)}</td>
-  <td>${renderPorts(containerPorts)}</td>
-  <td>${
-      containerNetworks.length
-          ? containerNetworks.map(n => n.name).join(", ")
-          : "-"
-  }</td>
-  <td>${hasPlan ? "🛠 Plan" : "OK"}</td>
-</tr>
-`;
-    }
-
-    html += `
-</tbody>
-</table>
-
-<br>
-
-<div>
-  <label>
-    <input type="checkbox" id="dryRunOnly" ${isExecuting ? "disabled" : ""}>
-    Dry-run only (no Docker changes)
-  </label>
+  <button class="primary"
+          onclick="applySelected()"
+          ${applyDisabled ? "disabled" : ""}
+          title="${applyTitle}">
+    Apply Selected ${selectedContainers.size > 0 ? `(${selectedContainers.size})` : ''}
+  </button>
 </div>
 
-<div>
-  <label>
-    <input type="checkbox" id="allowMutation" ${isExecuting ? "disabled" : ""}>
-    Allow Docker mutation
-  </label>
-</div>
-
-<div>
-  <input type="text"
-         id="confirmText"
-         placeholder="${CONFIRM_PHRASE}"
-         size="42"
-         ${isExecuting ? "disabled" : ""}>
-</div>
-
-<br>
-
-<button onclick="applySelected()" ${isExecuting ? "disabled" : ""}>
-  ${isExecuting ? "Executing..." : "Apply Selected"}
-</button>
-`;
-
-    if (activeJobId) {
-        html += `
-<hr>
-<h3>Execution Progress</h3>
-<div id="job-events"
-     style="border:1px solid #ccc; padding:8px; max-height:240px; overflow:auto; font-family:monospace; font-size:12px;">
+<div class="panel">
+  <h3>Policy Enforcement (Intent Only)</h3>
+  <div style="font-size: 13px;">
+    Selected for enforcement: <strong>${enforcementCount}</strong>
+  </div>
+  <div style="margin-top: 8px;">
+    <button onclick="clearPolicyEnforcementIntent()"
+            ${enforcementCount ? "" : "disabled"}>
+      Clear enforcement intent
+    </button>
+  </div>
+  <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">
+    This does not apply changes. It only records intent.
+  </div>
 </div>
 `;
+
+        content = Layout.render({ left: leftHtml, right: rightHtml });
+        
+    } else if (window.TabsUI && window.TabsUI.currentTab === 'history') {
+        // HISTORY TAB - Show execution history with rollback options
+        const historyHtml = window.TabsUI.renderHistoryView(
+            lastExecutionJobs || new Map(),
+            containers
+        );
+        content = historyHtml;
     }
 
-    if (lastExecutionResult) {
-        html += `
-<hr>
-<h3>Last Execution Result</h3>
-<pre>${JSON.stringify(lastExecutionResult, null, 2)}</pre>
-`;
-    }
-
-    document.getElementById("output").innerHTML = html;
+    out.innerHTML = tabBar + content;
 }
 
 /* ============================================================================
@@ -178,37 +263,33 @@ function renderTable() {
 ============================================================================ */
 
 function renderPorts(ports) {
-    if (!ports.length) return "-";
+    if (!ports || !ports.length) return "-";
 
-    return ports
-        .map(p => {
-            const label = `${p.host}:${p.container}/${p.protocol}`;
-            if (p.protocol === "tcp") {
-                return `<a href="http://${HOST_IP}:${p.host}" target="_blank">${label}</a>`;
-            }
-            return label;
-        })
-        .join("<br>");
-}
-
-function appendJobEvent(evt) {
-    const box = document.getElementById("job-events");
-    if (!box) return;
-
-    const line = document.createElement("div");
-    line.textContent = `[${evt.type}] ${evt.container || ""} ${evt.actionType || ""} ${evt.error || ""}`;
-    box.appendChild(line);
-    box.scrollTop = box.scrollHeight;
+    return ports.map(p => {
+        const host = p.host || '?';
+        const container = p.containerPort || '?';
+        const proto = p.protocol || 'tcp';
+        
+        // Format: host:container/proto with tooltip
+        const label = `<span style="color:#39d0d8;font-weight:600;">${host}</span>:<span style="color:#8b949e;">${container}</span>/<span style="opacity:0.7;font-size:11px;">${proto}</span>`;
+        
+        const title = `External: ${host} → Container: ${container} (${proto.toUpperCase()})`;
+        
+        return proto === "tcp"
+            ? `<a href="http://${HOST_IP}:${host}" target="_blank" title="${title}">${label}</a>`
+            : `<span title="${title}">${label}</span>`;
+    }).join("<br>");
 }
 
 /* ============================================================================
-   Apply + SSE wiring
+   Apply
 ============================================================================ */
 
 async function applySelected() {
-    const selectedContainers = Array.from(
-        document.querySelectorAll(".apply-box:checked")
-    ).map(cb => cb.dataset.container);
+    // Get selected containers from enforcement intent (not checkboxes)
+    const selectedContainers = Object.keys(
+        window.__policyEnforcementIntent || {}
+    ).filter(name => window.__policyEnforcementIntent[name] === true);
 
     if (!selectedContainers.length) {
         alert("No containers selected.");
@@ -216,11 +297,10 @@ async function applySelected() {
     }
 
     const dryRun = document.getElementById("dryRunOnly")?.checked;
-    const allowDockerMutation =
-        document.getElementById("allowMutation")?.checked;
+    const allowDockerMutation = document.getElementById("allowMutation")?.checked;
 
     if (!dryRun && !allowDockerMutation) {
-        alert("Docker mutation must be explicitly allowed.");
+        alert("Planned changes must be explicitly allowed.");
         return;
     }
 
@@ -231,54 +311,80 @@ async function applySelected() {
     }
 
     isExecuting = true;
-    lastExecutionResult = null;
-    activeJobId = null;
-    renderTable();
+    render();
 
     const res = await fetch("/api/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             selectedContainers,
-            categoryOverrides,
+            categoryOverrides: CategoryOverridesUI.categoryOverrides,
+            policyEnforcement: window.__policyEnforcementIntent,
             allowDockerMutation,
             dryRun,
             confirmPhrase: confirmText
         })
     });
 
-    const { jobId } = await res.json();
-    activeJobId = jobId;
-    renderTable();
-
-    // Open SSE stream
-    eventSource = new EventSource(`/api/jobs/${jobId}/events`);
-
-    eventSource.onmessage = (e) => {
-        const evt = JSON.parse(e.data);
-        appendJobEvent(evt);
-
-        if (evt.type === "job:stored" || evt.type === "job:complete") {
-            eventSource.close();
-            eventSource = null;
-            activeJobId = null;
-            isExecuting = false;
-
-            // Refresh state after completion
-            scan();
-        }
-    };
-
-    eventSource.onerror = () => {
-        eventSource.close();
-        eventSource = null;
+    const payload = await res.json();
+    if (!payload?.jobId) {
         isExecuting = false;
-        scan();
-    };
+        alert("Apply failed.");
+        render();
+        return;
+    }
+
+    activeJobId = payload.jobId;
+    
+    // Poll for job completion
+    await pollJobCompletion(payload.jobId);
+}
+
+async function pollJobCompletion(jobId) {
+    const maxAttempts = 60; // 60 seconds max
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+        try {
+            const res = await fetch(`/api/jobs/${jobId}`);
+            const job = await res.json();
+            
+            if (job.status === 'completed' || job.status === 'failed') {
+                // Store completed job for history tab
+                lastExecutionJobs.set(jobId, job);
+                
+                isExecuting = false;
+                
+                if (job.status === 'completed') {
+                    alert(`Execution completed!\n\nJob ID: ${jobId}\n\nRefresh to see changes.`);
+                } else {
+                    alert(`Execution failed!\n\nError: ${job.error || 'Unknown error'}`);
+                }
+                
+                // Refresh data
+                await scan();
+                return;
+            }
+            
+            // Still running, wait and poll again
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            attempts++;
+            
+        } catch (err) {
+            console.error('Job polling error:', err);
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    // Timeout
+    isExecuting = false;
+    alert('Job execution timeout - check server logs');
+    await scan();
 }
 
 /* ============================================================================
-   Auto-start scan
+   Auto-start
 ============================================================================ */
 
 window.addEventListener("load", scan);

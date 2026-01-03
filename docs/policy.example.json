@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "description": "Example Port-MCP-Enforcer policy (non-binding)",
+  "roles": {
+    "games": {
+      "description": "Game servers (UDP-heavy, externally exposed)",
+      "ports": {
+        "ranges": [
+          { "from": 20000, "to": 29999 }
+        ],
+        "protocols": ["udp", "tcp"]
+      },
+      "networks": {
+        "preferred": ["games-net"],
+        "allowed": ["bridge", "games-net"],
+        "allowHost": false
+      }
+    },
+
+    "media": {
+      "description": "Media and *arr stack applications",
+      "ports": {
+        "ranges": [
+          { "from": 7000, "to": 8999 }
+        ],
+        "protocols": ["tcp"]
+      },
+      "networks": {
+        "preferred": ["unraidnet"],
+        "allowed": ["unraidnet", "bridge"],
+        "allowHost": false
+      }
+    },
+
+    "infra": {
+      "description": "Infrastructure and management services",
+      "ports": {
+        "ranges": [
+          { "from": 1, "to": 65535 }
+        ],
+        "protocols": ["tcp", "udp"]
+      },
+      "networks": {
+        "preferred": ["host", "br0"],
+        "allowed": ["host", "br0", "bridge"],
+        "allowHost": true
+      }
+    }
+  },
+
+  "classification": {
+    "rules": [
+      { "match": { "imagePrefix": "vinanrra/" }, "role": "games" },
+      { "match": { "imagePrefix": "itzg/" }, "role": "games" },
+      { "match": { "imagePrefix": "wolveix/" }, "role": "games" },
+
+      { "match": { "imagePrefix": "binhex-" }, "role": "media" },
+      { "match": { "nameContains": "radarr" }, "role": "media" },
+      { "match": { "nameContains": "sonarr" }, "role": "media" },
+      { "match": { "nameContains": "bazarr" }, "role": "media" },
+
+      { "match": { "network": "host" }, "role": "infra" },
+      { "match": { "nameContains": "nginx" }, "role": "infra" }
+    ]
+  }
+}

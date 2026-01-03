@@ -1,0 +1,27 @@
+{
+  "Glances": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767412240907
+  },
+  "satisfactory-server": {
+    "category": "games",
+    "source": "user",
+    "setAt": 1767412240907
+  },
+  "tautulli": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767412240907
+  },
+  "7dtd-server": {
+    "category": "games",
+    "source": "user",
+    "setAt": 1767412240907
+  },
+  "minecraft-server": {
+    "category": "games",
+    "source": "user",
+    "setAt": 1767412240907
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "port-mcp-enforcer",
+  "version": "0.1.0",
+  "description": "Opt-in CLI-first Docker mutation client for Port-MCP",
+  "bin": {
+    "port-mcp-enforcer": "./bin/port-mcp-enforcer.js"
+  },
+  "type": "commonjs"
+}

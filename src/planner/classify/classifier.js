@@ -12,6 +12,10 @@
  * - NO policy inference
  * - NO port planning
  * - Prefer "unknown" over incorrect classification
+ *
+ * Stage 3 add-on (minimal):
+ * - If caller provides overrides, they are authoritative:
+ *   category forced + confidence = 1.0 + reason "user override"
  * ============================================================================
  */
 
@@ -86,11 +90,39 @@ function gamePortSignal(container) {
     return container.ports.some(p => Number(p.host) >= 20000);
 }
 
+/**
+ * Overrides can be:
+ * - { "container-name": "games" }
+ * - { "container-name": { category: "games", ... } }
+ * - { "container-name": { category: "games", source: "user", setAt: ... } }
+ */
+function getOverrideCategory(overrides, containerName) {
+    if (!overrides || typeof overrides !== "object") return null;
+    const v = overrides[containerName];
+    if (!v) return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object" && typeof v.category === "string") return v.category;
+    return null;
+}
+
 /* ============================================================================
    Core classification logic
 ============================================================================ */
 
-function classifyContainer(container) {
+function classifyContainer(container, overrides) {
+    const overrideCategory = getOverrideCategory(overrides, container.name);
+    if (overrideCategory) {
+        return {
+            id: container.id,
+            name: container.name,
+            image: container.image,
+            category: overrideCategory,
+            confidence: 1.0,
+            reasons: ["user override"],
+            tags: []
+        };
+    }
+
     const name = norm(container.name);
     const image = norm(container.image);
 
@@ -160,12 +192,19 @@ function classifyContainer(container) {
    Public API
 ============================================================================ */
 
-module.exports = function classify(state) {
+/**
+ * Backward compatible:
+ * - classify(state)
+ * - classify(state, { overrides })
+ */
+module.exports = function classify(state, options = {}) {
     if (!state || !Array.isArray(state.containers)) {
         throw new Error("Classifier requires normalized state with containers[]");
     }
 
+    const overrides = options?.overrides || {};
+
     return {
-        containers: state.containers.map(classifyContainer)
+        containers: state.containers.map(c => classifyContainer(c, overrides))
     };
 };

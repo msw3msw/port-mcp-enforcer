@@ -1,0 +1,17 @@
+{
+  "dryRun": false,
+  "actions": [
+    {
+      "type": "update-container-ports",
+      "container": "tautulli",
+      "from": [
+        { "host": 8183, "container": 8181, "protocol": "tcp" },
+        { "host": 8183, "container": 8181, "protocol": "tcp" }
+      ],
+      "to": [
+        { "host": 8183, "container": 8181, "protocol": "tcp" }
+      ],
+      "reason": "Step 4.1 validation test on Tautulli"
+    }
+  ]
+}
