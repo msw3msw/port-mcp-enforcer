@@ -1,0 +1,1081 @@
+{
+  "fetchedAt": 1767433066892,
+  "containers": [
+    {
+      "id": "8a2690288e18e3abcb41efa647351e11a8bd1acf4094407d7df6eb81b7becefe",
+      "name": "Glances",
+      "image": "nicolargo/glances:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 61208,
+          "protocol": "tcp",
+          "host": 5000,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 61208,
+          "protocol": "tcp",
+          "host": 5000,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.12",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "fb60b37f0d58f0e010b2c2593c2792b94c3fd1b22160827d0f4db259ac2b3130",
+      "name": "tautulli",
+      "image": "ghcr.io/hotio/tautulli:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 8181,
+          "protocol": "tcp",
+          "host": 8183,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8181,
+          "protocol": "tcp",
+          "host": 8183,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.4",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "033b130d2323015f74012223358fb81a21c3558faf4a0352c068c2094f2464cf",
+      "name": "port-mcp",
+      "image": "port-mcp-runtime:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 4100,
+          "protocol": "tcp",
+          "host": 4100,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 4100,
+          "protocol": "tcp",
+          "host": 4100,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.3",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "4a05105bdd28d209cb098d4af6341fcdb61be9e3fb652d10d3e6bafea83faf0a",
+      "name": "dockersocket",
+      "image": "ghcr.io/tecnativa/docker-socket-proxy:latest",
+      "state": "running",
+      "running": true,
+      "ports": [],
+      "networks": [
+        {
+          "name": "backup",
+          "ip": "172.18.0.2",
+          "gateway": "172.18.0.1"
+        }
+      ]
+    },
+    {
+      "id": "44272385dc3c0c4dee19a93fe409a3a897f332f2cfe950f696988d5cc996f1fe",
+      "name": "UnraidConfigGuardian",
+      "image": "stephondoestech/unraid-config-guardian:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 7842,
+          "protocol": "tcp",
+          "host": 7842,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7842,
+          "protocol": "tcp",
+          "host": 7842,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.2",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "name": "7dtd-server",
+      "image": "vinanrra/7dtd-server",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 26900,
+          "protocol": "udp",
+          "host": 26900,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 26900,
+          "protocol": "udp",
+          "host": 26900,
+          "ip": "::"
+        },
+        {
+          "container": 26901,
+          "protocol": "udp",
+          "host": 26901,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 26901,
+          "protocol": "udp",
+          "host": 26901,
+          "ip": "::"
+        },
+        {
+          "container": 26902,
+          "protocol": "udp",
+          "host": 26902,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 26902,
+          "protocol": "udp",
+          "host": 26902,
+          "ip": "::"
+        },
+        {
+          "container": 26903,
+          "protocol": "udp",
+          "host": 26903,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 26903,
+          "protocol": "udp",
+          "host": 26903,
+          "ip": "::"
+        },
+        {
+          "container": 8080,
+          "protocol": "tcp",
+          "host": 8182,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8080,
+          "protocol": "tcp",
+          "host": 8182,
+          "ip": "::"
+        },
+        {
+          "container": 8081,
+          "protocol": "tcp",
+          "host": 8282,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8081,
+          "protocol": "tcp",
+          "host": 8282,
+          "ip": "::"
+        },
+        {
+          "container": 8082,
+          "protocol": "tcp",
+          "host": 8382,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8082,
+          "protocol": "tcp",
+          "host": 8382,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.6",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "b01a0d89fe9e5e18b9ffa32bd80f602b9caa82fdfca8a1bc327bfebda410229d",
+      "name": "minecraft-server",
+      "image": "itzg/minecraft-server",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 25565,
+          "protocol": "tcp",
+          "host": 25565,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 25565,
+          "protocol": "tcp",
+          "host": 25565,
+          "ip": "::"
+        },
+        {
+          "container": 25575,
+          "protocol": "tcp",
+          "host": 25575,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 25575,
+          "protocol": "tcp",
+          "host": 25575,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.8",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "b9fb8bba2ae1b84ec79b812decadc55cb74af6d1f8b28a25fd98f44749efacaf",
+      "name": "conan-server",
+      "image": "ich777/steamcmd:conanexiles",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 27015,
+          "protocol": "udp",
+          "host": 27016,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 27015,
+          "protocol": "udp",
+          "host": 27016,
+          "ip": "::"
+        },
+        {
+          "container": 7777,
+          "protocol": "udp",
+          "host": 7778,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7777,
+          "protocol": "udp",
+          "host": 7778,
+          "ip": "::"
+        },
+        {
+          "container": 7778,
+          "protocol": "udp",
+          "host": 7779,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7778,
+          "protocol": "udp",
+          "host": 7779,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.5",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "ecfea8f1c885454a5744ec29669d23801719e8937ac7a100f2869c7e5dbfa05c",
+      "name": "bazarr",
+      "image": "lscr.io/linuxserver/bazarr",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 6767,
+          "protocol": "tcp",
+          "host": 6767,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 6767,
+          "protocol": "tcp",
+          "host": 6767,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.4",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "05c944f42397e0259f2a2226f96c039fd57dd83195c13b1506145db252b78803",
+      "name": "arr-dashboard",
+      "image": "khak1s/arr-dashboard:latest",
+      "state": "exited",
+      "running": false,
+      "ports": [],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": null,
+          "gateway": null
+        }
+      ]
+    },
+    {
+      "id": "6a5acaf095504464173a9ce2e38be80875fdbf875d314d3a0ccba9fbd9c0c95d",
+      "name": "ServerDeck",
+      "image": "serverdeck-v4:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 4000,
+          "protocol": "tcp",
+          "host": 4000,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 4000,
+          "protocol": "tcp",
+          "host": 4000,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.9",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "090ba2961cd63c0721e33a8ba866f13035554e64f38c1bbae9c0bcbf918b291a",
+      "name": "Icarus",
+      "image": "ghcr.io/ich777/steamcmd:icarus",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 17777,
+          "protocol": "udp",
+          "host": 17777,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 17777,
+          "protocol": "udp",
+          "host": 17777,
+          "ip": "::"
+        },
+        {
+          "container": 27015,
+          "protocol": "udp",
+          "host": 27015,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 27015,
+          "protocol": "udp",
+          "host": 27015,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.11",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "3e5e00dc69b5658c8a9cc244b60a3c911212e4ccb7f033c3c9511f3d836f6c85",
+      "name": "satisfactory-server",
+      "image": "wolveix/satisfactory-server",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 7777,
+          "protocol": "tcp",
+          "host": 7777,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7777,
+          "protocol": "tcp",
+          "host": 7777,
+          "ip": "::"
+        },
+        {
+          "container": 7777,
+          "protocol": "udp",
+          "host": 7777,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7777,
+          "protocol": "udp",
+          "host": 7777,
+          "ip": "::"
+        },
+        {
+          "container": 8888,
+          "protocol": "tcp",
+          "host": 8888,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8888,
+          "protocol": "tcp",
+          "host": 8888,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.10",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "c9e39bfd398d413c64dfed7844bc9d7414dd489aee7b357c502069446fd2fb9a",
+      "name": "binhex-plexpass",
+      "image": "ghcr.io/binhex/arch-plexpass",
+      "state": "running",
+      "running": true,
+      "ports": [],
+      "networks": [
+        {
+          "name": "host",
+          "ip": null,
+          "gateway": null
+        }
+      ]
+    },
+    {
+      "id": "822af1a70485bea11092bd9a70b0660797ec80f6cc9dff4d712cf7c5f6a970ec",
+      "name": "Nginx-Proxy-Manager-Official",
+      "image": "jc21/nginx-proxy-manager",
+      "state": "running",
+      "running": true,
+      "ports": [],
+      "networks": [
+        {
+          "name": "br0",
+          "ip": "192.168.0.150",
+          "gateway": "192.168.0.1"
+        }
+      ]
+    },
+    {
+      "id": "033802e6f1fb4b9197836fdc114fbde9b5ff7939ee554de00646246275534d46",
+      "name": "binhex-radarr",
+      "image": "ghcr.io/binhex/arch-radarr",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 7878,
+          "protocol": "tcp",
+          "host": 7878,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 7878,
+          "protocol": "tcp",
+          "host": 7878,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.3",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "4911d2cb76503cd8a22914f462d7b37a2d7c4441c108a076ac57f2214ebfd7de",
+      "name": "binhex-prowlarr",
+      "image": "ghcr.io/binhex/arch-prowlarr",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 9696,
+          "protocol": "tcp",
+          "host": 9696,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 9696,
+          "protocol": "tcp",
+          "host": 9696,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.2",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "865acba2e2003ab3291716e4e59441253842e46dcee829802936de994fd90e5b",
+      "name": "binhex-sabnzbd",
+      "image": "ghcr.io/binhex/arch-sabnzbd",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 8080,
+          "protocol": "tcp",
+          "host": 8090,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8080,
+          "protocol": "tcp",
+          "host": 8090,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.6",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "55567f1e5e89104b5fe15e6eed550e2d0661c9a3f6beb122bc038823a9bd91b9",
+      "name": "sonarr",
+      "image": "ghcr.io/binhex/arch-sonarr",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 8989,
+          "protocol": "tcp",
+          "host": 8989,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8989,
+          "protocol": "tcp",
+          "host": 8989,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.8",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "9fdf26c1472d802df7cceceaa5cc9726f439e90eaf0f4e60586088ecbf56be3c",
+      "name": "binhex-overseerr",
+      "image": "ghcr.io/binhex/arch-overseerr",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 5055,
+          "protocol": "tcp",
+          "host": 5055,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 5055,
+          "protocol": "tcp",
+          "host": 5055,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "bridge",
+          "ip": "172.17.0.7",
+          "gateway": "172.17.0.1"
+        }
+      ]
+    },
+    {
+      "id": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "name": "binhex-delugevpn",
+      "image": "ghcr.io/binhex/arch-delugevpn",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 58846,
+          "protocol": "tcp",
+          "host": 58846,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 58846,
+          "protocol": "tcp",
+          "host": 58846,
+          "ip": "::"
+        },
+        {
+          "container": 58946,
+          "protocol": "tcp",
+          "host": 58946,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 58946,
+          "protocol": "tcp",
+          "host": 58946,
+          "ip": "::"
+        },
+        {
+          "container": 58946,
+          "protocol": "udp",
+          "host": 58946,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 58946,
+          "protocol": "udp",
+          "host": 58946,
+          "ip": "::"
+        },
+        {
+          "container": 8112,
+          "protocol": "tcp",
+          "host": 8112,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8112,
+          "protocol": "tcp",
+          "host": 8112,
+          "ip": "::"
+        },
+        {
+          "container": 8118,
+          "protocol": "tcp",
+          "host": 8118,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 8118,
+          "protocol": "tcp",
+          "host": 8118,
+          "ip": "::"
+        },
+        {
+          "container": 9118,
+          "protocol": "tcp",
+          "host": 9118,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 9118,
+          "protocol": "tcp",
+          "host": 9118,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.5",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    },
+    {
+      "id": "93cf9697bfbee4a6c650152fbf1bbd8a75beefa90b8c109c1c6982b9a669c6a8",
+      "name": "Huntarr",
+      "image": "huntarr/huntarr:latest",
+      "state": "running",
+      "running": true,
+      "ports": [
+        {
+          "container": 9705,
+          "protocol": "tcp",
+          "host": 9705,
+          "ip": "0.0.0.0"
+        },
+        {
+          "container": 9705,
+          "protocol": "tcp",
+          "host": 9705,
+          "ip": "::"
+        }
+      ],
+      "networks": [
+        {
+          "name": "unraidnet",
+          "ip": "172.19.0.7",
+          "gateway": "172.19.0.1"
+        }
+      ]
+    }
+  ],
+  "ports": [
+    {
+      "container": "Glances",
+      "containerId": "8a2690288e18e3abcb41efa647351e11a8bd1acf4094407d7df6eb81b7becefe",
+      "host": 5000,
+      "containerPort": 61208,
+      "protocol": "tcp"
+    },
+    {
+      "container": "tautulli",
+      "containerId": "fb60b37f0d58f0e010b2c2593c2792b94c3fd1b22160827d0f4db259ac2b3130",
+      "host": 8183,
+      "containerPort": 8181,
+      "protocol": "tcp"
+    },
+    {
+      "container": "port-mcp",
+      "containerId": "033b130d2323015f74012223358fb81a21c3558faf4a0352c068c2094f2464cf",
+      "host": 4100,
+      "containerPort": 4100,
+      "protocol": "tcp"
+    },
+    {
+      "container": "UnraidConfigGuardian",
+      "containerId": "44272385dc3c0c4dee19a93fe409a3a897f332f2cfe950f696988d5cc996f1fe",
+      "host": 7842,
+      "containerPort": 7842,
+      "protocol": "tcp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 26900,
+      "containerPort": 26900,
+      "protocol": "udp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 26901,
+      "containerPort": 26901,
+      "protocol": "udp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 26902,
+      "containerPort": 26902,
+      "protocol": "udp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 26903,
+      "containerPort": 26903,
+      "protocol": "udp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 8182,
+      "containerPort": 8080,
+      "protocol": "tcp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 8282,
+      "containerPort": 8081,
+      "protocol": "tcp"
+    },
+    {
+      "container": "7dtd-server",
+      "containerId": "9589eb9002a4d9b35a2ae44a47640b43a95a06437b4b7e44108b3aa425101c25",
+      "host": 8382,
+      "containerPort": 8082,
+      "protocol": "tcp"
+    },
+    {
+      "container": "minecraft-server",
+      "containerId": "b01a0d89fe9e5e18b9ffa32bd80f602b9caa82fdfca8a1bc327bfebda410229d",
+      "host": 25565,
+      "containerPort": 25565,
+      "protocol": "tcp"
+    },
+    {
+      "container": "minecraft-server",
+      "containerId": "b01a0d89fe9e5e18b9ffa32bd80f602b9caa82fdfca8a1bc327bfebda410229d",
+      "host": 25575,
+      "containerPort": 25575,
+      "protocol": "tcp"
+    },
+    {
+      "container": "conan-server",
+      "containerId": "b9fb8bba2ae1b84ec79b812decadc55cb74af6d1f8b28a25fd98f44749efacaf",
+      "host": 27016,
+      "containerPort": 27015,
+      "protocol": "udp"
+    },
+    {
+      "container": "conan-server",
+      "containerId": "b9fb8bba2ae1b84ec79b812decadc55cb74af6d1f8b28a25fd98f44749efacaf",
+      "host": 7778,
+      "containerPort": 7777,
+      "protocol": "udp"
+    },
+    {
+      "container": "conan-server",
+      "containerId": "b9fb8bba2ae1b84ec79b812decadc55cb74af6d1f8b28a25fd98f44749efacaf",
+      "host": 7779,
+      "containerPort": 7778,
+      "protocol": "udp"
+    },
+    {
+      "container": "bazarr",
+      "containerId": "ecfea8f1c885454a5744ec29669d23801719e8937ac7a100f2869c7e5dbfa05c",
+      "host": 6767,
+      "containerPort": 6767,
+      "protocol": "tcp"
+    },
+    {
+      "container": "ServerDeck",
+      "containerId": "6a5acaf095504464173a9ce2e38be80875fdbf875d314d3a0ccba9fbd9c0c95d",
+      "host": 4000,
+      "containerPort": 4000,
+      "protocol": "tcp"
+    },
+    {
+      "container": "Icarus",
+      "containerId": "090ba2961cd63c0721e33a8ba866f13035554e64f38c1bbae9c0bcbf918b291a",
+      "host": 17777,
+      "containerPort": 17777,
+      "protocol": "udp"
+    },
+    {
+      "container": "Icarus",
+      "containerId": "090ba2961cd63c0721e33a8ba866f13035554e64f38c1bbae9c0bcbf918b291a",
+      "host": 27015,
+      "containerPort": 27015,
+      "protocol": "udp"
+    },
+    {
+      "container": "satisfactory-server",
+      "containerId": "3e5e00dc69b5658c8a9cc244b60a3c911212e4ccb7f033c3c9511f3d836f6c85",
+      "host": 7777,
+      "containerPort": 7777,
+      "protocol": "tcp"
+    },
+    {
+      "container": "satisfactory-server",
+      "containerId": "3e5e00dc69b5658c8a9cc244b60a3c911212e4ccb7f033c3c9511f3d836f6c85",
+      "host": 7777,
+      "containerPort": 7777,
+      "protocol": "udp"
+    },
+    {
+      "container": "satisfactory-server",
+      "containerId": "3e5e00dc69b5658c8a9cc244b60a3c911212e4ccb7f033c3c9511f3d836f6c85",
+      "host": 8888,
+      "containerPort": 8888,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-radarr",
+      "containerId": "033802e6f1fb4b9197836fdc114fbde9b5ff7939ee554de00646246275534d46",
+      "host": 7878,
+      "containerPort": 7878,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-prowlarr",
+      "containerId": "4911d2cb76503cd8a22914f462d7b37a2d7c4441c108a076ac57f2214ebfd7de",
+      "host": 9696,
+      "containerPort": 9696,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-sabnzbd",
+      "containerId": "865acba2e2003ab3291716e4e59441253842e46dcee829802936de994fd90e5b",
+      "host": 8090,
+      "containerPort": 8080,
+      "protocol": "tcp"
+    },
+    {
+      "container": "sonarr",
+      "containerId": "55567f1e5e89104b5fe15e6eed550e2d0661c9a3f6beb122bc038823a9bd91b9",
+      "host": 8989,
+      "containerPort": 8989,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-overseerr",
+      "containerId": "9fdf26c1472d802df7cceceaa5cc9726f439e90eaf0f4e60586088ecbf56be3c",
+      "host": 5055,
+      "containerPort": 5055,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 58846,
+      "containerPort": 58846,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 58946,
+      "containerPort": 58946,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 58946,
+      "containerPort": 58946,
+      "protocol": "udp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 8112,
+      "containerPort": 8112,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 8118,
+      "containerPort": 8118,
+      "protocol": "tcp"
+    },
+    {
+      "container": "binhex-delugevpn",
+      "containerId": "4c39b044017562808740b5b3db5d6b0baeac2c6c447b61dcf024ee081c8eda4a",
+      "host": 9118,
+      "containerPort": 9118,
+      "protocol": "tcp"
+    },
+    {
+      "container": "Huntarr",
+      "containerId": "93cf9697bfbee4a6c650152fbf1bbd8a75beefa90b8c109c1c6982b9a669c6a8",
+      "host": 9705,
+      "containerPort": 9705,
+      "protocol": "tcp"
+    }
+  ],
+  "networks": [
+    {
+      "id": "4114af6c5b0c50395be5eb09d89b08a6eaaeac2e6a983931f4ea4848e5330516",
+      "name": "backup",
+      "driver": "bridge",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 1
+    },
+    {
+      "id": "c7c3a6f1e3c9eb1df9b9a8c421af29f40c190445cd7d9ceb8f84ed6cec7714ab",
+      "name": "br0",
+      "driver": "macvlan",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 1
+    },
+    {
+      "id": "39e1cbc9c92207577e06b0c8570611a1ba8f88133e1b0677471284536e881fba",
+      "name": "bridge",
+      "driver": "bridge",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 11
+    },
+    {
+      "id": "2af1494bc1bcf33430479e5b971b86cae55a00ea8786d0a6c7f720a1403c5613",
+      "name": "host",
+      "driver": "host",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 1
+    },
+    {
+      "id": "aeb85d196764eb9315f021f3c5e3e5e6ee0bf7dd607c76b9022288b3e1034542",
+      "name": "none",
+      "driver": "null",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 0
+    },
+    {
+      "id": "ce1d5ce0bf0af527779026162e2269a29243ac5692d302f008663f245f19e728",
+      "name": "unraidnet",
+      "driver": "bridge",
+      "scope": "local",
+      "internal": false,
+      "containerCount": 7
+    }
+  ],
+  "registry": [
+    {
+      "host": 20000,
+      "protocol": "udp",
+      "owner": "manual-test",
+      "range": "games",
+      "createdAt": 1767322446351,
+      "bindingUpdatedAt": 1767324840479,
+      "bindingRemovedAt": 1767324846311
+    }
+  ]
+}

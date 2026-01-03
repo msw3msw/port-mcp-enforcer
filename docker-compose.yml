@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  port-mcp-enforcer:
+    build: .
+    container_name: port-mcp-enforcer
+    ports:
+      - "4200:4200"
+    volumes:
+      # Mount Docker socket to interact with containers
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Persist snapshots across container restarts
+      - ./snapshots:/app/snapshots
+      
+      # Persist category overrides
+      - ./data:/app/src/ui/web/data
+    
+    environment:
+      # Port-MCP server URL (adjust to your setup)
+      - PORT_MCP_URL=http://host.docker.internal:4100
+      
+      # Optional: Set host IP for port links in UI
+      - HOST_IP=192.168.0.100
+    
+    networks:
+      - port-mcp-net
+    
+    restart: unless-stopped
+    
+    # Add extra_hosts for host.docker.internal on Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  port-mcp-net:
+    name: port-mcp-net
+    driver: bridge

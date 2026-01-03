@@ -1,0 +1,14 @@
+{
+  "generatedAt": 1767433066896,
+  "totalChanges": 1,
+  "changes": [
+    {
+      "type": "changed",
+      "container": "Glances",
+      "containerPort": 61208,
+      "protocol": "tcp",
+      "from": 1025,
+      "to": 5000
+    }
+  ]
+}

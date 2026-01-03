@@ -25,6 +25,28 @@ const crypto = require("crypto");
 const url = require("url");
 
 /* ============================================================================
+   Inject no-op confirm module to suppress executor terminal prompts
+   The web UI already has its own gates, so we don't need CLI prompts
+============================================================================ */
+
+const Module = require('module');
+const confirmPath = path.resolve(__dirname, '../../executor/confirm.js');
+const noOpConfirmPath = path.resolve(__dirname, 'no-op-confirm.js');
+
+// Pre-load our no-op confirm module
+const noOpConfirm = require('./no-op-confirm');
+
+// Inject it into the module cache so executor uses it instead
+Module._cache[confirmPath] = {
+    id: confirmPath,
+    filename: confirmPath,
+    loaded: true,
+    exports: noOpConfirm
+};
+
+console.log('[Server] Injected no-op confirm module (web UI mode)');
+
+/* ============================================================================
    Planner / Executor Dependencies (AUTHORITATIVE)
 ============================================================================ */
 
@@ -418,6 +440,43 @@ const server = http.createServer(async (req, res) => {
 
     if (method === "POST" && parsed.pathname === "/api/rollback/apply") {
         return rollback.handleRollbackApply(req, res, json);
+    }
+
+    /* =====================================================================
+       GET /api/jobs/:id/events (SSE) - MUST BE BEFORE /api/jobs/:id
+    ===================================================================== */
+
+    if (method === "GET" && parsed.pathname.match(/^\/api\/jobs\/[^/]+\/events$/)) {
+        const pathParts = parsed.pathname.split("/");
+        const id = pathParts[3]; // /api/jobs/{id}/events
+        const job = jobs.get(id);
+        
+        if (!job) return notFound(res);
+
+        // Setup SSE
+        res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        });
+
+        // Send existing events
+        for (const evt of job.events) {
+            res.write(`data: ${JSON.stringify(evt)}\n\n`);
+        }
+
+        // Listen for new events
+        const listenerId = uuid();
+        job.listeners[listenerId] = (evt) => {
+            res.write(`data: ${JSON.stringify(evt)}\n\n`);
+        };
+
+        // Cleanup on disconnect
+        req.on("close", () => {
+            delete job.listeners[listenerId];
+        });
+
+        return;
     }
 
     /* =====================================================================

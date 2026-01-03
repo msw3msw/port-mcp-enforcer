@@ -1,1 +1,6 @@
+node_modules/
+*.log
 executor-audit.log
+webui.log
+.DS_Store
+

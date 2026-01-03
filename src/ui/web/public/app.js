@@ -138,6 +138,20 @@ function render() {
         (portsByContainer[p.container] ||= []).push(p);
     }
 
+    // Filter out standardized containers from Overview
+    let containersForOverview = containers;
+    
+    if (window.StandardizedTabUI) {
+        const standardizedContainers = window.StandardizedTabUI.getStandardizedContainers(
+            containers,
+            portsByContainer,
+            CategoryOverridesUI.categoryOverrides
+        );
+        
+        const standardizedNames = new Set(standardizedContainers.map(c => c.name));
+        containersForOverview = containers.filter(c => !standardizedNames.has(c.name));
+    }
+
     // Render tab bar
     const tabBar = window.TabsUI ? window.TabsUI.renderTabBar() : '';
     
@@ -145,9 +159,9 @@ function render() {
     let content = '';
     
     if (!window.TabsUI || window.TabsUI.currentTab === 'overview') {
-        // OVERVIEW TAB - Existing container table
+        // OVERVIEW TAB - Container table (excluding standardized)
         const leftHtml = RenderTableUI.renderContainersTable({
-            containers,
+            containers: containersForOverview,  // Filtered list
             portsByContainer,
             actionsByContainer,
             categoryOverrides: CategoryOverridesUI.categoryOverrides,
@@ -246,6 +260,19 @@ function render() {
 
         content = Layout.render({ left: leftHtml, right: rightHtml });
         
+    } else if (window.TabsUI && window.TabsUI.currentTab === 'standardized') {
+        // STANDARDIZED TAB - Show compliant containers only
+        if (window.StandardizedTabUI) {
+            content = window.StandardizedTabUI.renderStandardizedTab(
+                containers,
+                portsByContainer,
+                CategoryOverridesUI.categoryOverrides,
+                renderPorts
+            );
+        } else {
+            content = '<div class="panel">Standardized tab not loaded</div>';
+        }
+        
     } else if (window.TabsUI && window.TabsUI.currentTab === 'history') {
         // HISTORY TAB - Show execution history with rollback options
         const historyHtml = window.TabsUI.renderHistoryView(
@@ -341,7 +368,38 @@ async function applySelected() {
 }
 
 async function pollJobCompletion(jobId) {
-    const maxAttempts = 60; // 60 seconds max
+    // Use SSE for live updates
+    const eventSource = new EventSource(`/api/jobs/${jobId}/events`);
+    
+    eventSource.onmessage = (event) => {
+        const evt = JSON.parse(event.data);
+        console.log('[Job Event]', evt);
+        
+        // Update UI with progress
+        if (evt.type === 'action:start') {
+            console.log(`Executing action ${evt.index + 1}/${evt.total}: ${evt.actionType} on ${evt.container}`);
+        }
+        
+        if (evt.type === 'job:completed') {
+            eventSource.close();
+            handleJobComplete(jobId, 'completed');
+        }
+        
+        if (evt.type === 'job:failed') {
+            eventSource.close();
+            handleJobComplete(jobId, 'failed', evt.error);
+        }
+    };
+    
+    eventSource.onerror = () => {
+        eventSource.close();
+        // Fallback to polling
+        pollJobCompletionFallback(jobId);
+    };
+}
+
+async function pollJobCompletionFallback(jobId) {
+    const maxAttempts = 60;
     let attempts = 0;
     
     while (attempts < maxAttempts) {
@@ -349,24 +407,16 @@ async function pollJobCompletion(jobId) {
             const res = await fetch(`/api/jobs/${jobId}`);
             const job = await res.json();
             
-            if (job.status === 'completed' || job.status === 'failed') {
-                // Store completed job for history tab
-                lastExecutionJobs.set(jobId, job);
-                
-                isExecuting = false;
-                
-                if (job.status === 'completed') {
-                    alert(`Execution completed!\n\nJob ID: ${jobId}\n\nRefresh to see changes.`);
-                } else {
-                    alert(`Execution failed!\n\nError: ${job.error || 'Unknown error'}`);
-                }
-                
-                // Refresh data
-                await scan();
+            if (job.status === 'completed') {
+                handleJobComplete(jobId, 'completed');
                 return;
             }
             
-            // Still running, wait and poll again
+            if (job.status === 'failed') {
+                handleJobComplete(jobId, 'failed', job.error);
+                return;
+            }
+            
             await new Promise(resolve => setTimeout(resolve, 1000));
             attempts++;
             
@@ -377,9 +427,27 @@ async function pollJobCompletion(jobId) {
         }
     }
     
-    // Timeout
     isExecuting = false;
     alert('Job execution timeout - check server logs');
+    await scan();
+}
+
+async function handleJobComplete(jobId, status, error = null) {
+    const res = await fetch(`/api/jobs/${jobId}`);
+    const job = await res.json();
+    
+    // Store completed job for history tab
+    lastExecutionJobs.set(jobId, job);
+    
+    isExecuting = false;
+    
+    if (status === 'completed') {
+        alert(`Execution completed!\n\nJob ID: ${jobId}\n\nRefresh to see changes.`);
+    } else {
+        alert(`Execution failed!\n\nError: ${error || 'Unknown error'}`);
+    }
+    
+    // Refresh data
     await scan();
 }
 

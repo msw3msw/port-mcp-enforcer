@@ -40,6 +40,13 @@ window.TabsUI = {
         <span class="tab-label">Overview</span>
     </button>
     
+    <button class="tab-button ${this.currentTab === 'standardized' ? 'active' : ''}"
+            data-tab="standardized" 
+            onclick="window.TabsUI.switchTab('standardized')">
+        <span class="tab-icon">✅</span>
+        <span class="tab-label">Standardized</span>
+    </button>
+    
     <button class="tab-button ${this.currentTab === 'history' ? 'active' : ''}"
             data-tab="history" 
             onclick="window.TabsUI.switchTab('history')">
@@ -51,20 +58,109 @@ window.TabsUI = {
     },
     
     renderHistoryView(jobs, containers) {
-        if (!jobs || jobs.size === 0) {
-            return `
+        // jobs parameter is ignored - we'll fetch from server
+        // This function is called synchronously but we need async fetch
+        // So we'll show a loading state and fetch in the background
+        
+        // Trigger async load
+        this.loadAndRenderHistory(containers);
+        
+        // Return loading placeholder
+        return `
 <div class="panel">
-    <div style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
-        <div style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;">📜</div>
+    <div id="history-content" style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
+        <div style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;">⏳</div>
         <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
-            No execution history
+            Loading history...
         </h2>
-        <p>Execute some changes to see history here</p>
+        <p>Fetching execution jobs from server</p>
     </div>
 </div>
 `;
+    },
+    
+    async loadAndRenderHistory(containers) {
+        try {
+            // Fetch snapshots from disk (not in-memory jobs)
+            const res = await fetch('/api/snapshots');
+            if (!res.ok) throw new Error('Failed to fetch snapshots');
+            
+            const data = await res.json();
+            const snapshots = data.snapshots || [];
+            
+            if (snapshots.length === 0) {
+                document.getElementById('history-content').innerHTML = `
+                    <div style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;">📜</div>
+                        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                            No execution history
+                        </h2>
+                        <p>Execute some changes to see history here</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Convert snapshots to job format for rendering
+            const jobs = new Map();
+            
+            for (const snapshot of snapshots) {
+                // Skip rollback/restore jobs
+                if (snapshot.kind === 'rollback' || snapshot.kind === 'restore') {
+                    continue;
+                }
+                
+                // Fetch full snapshot details
+                try {
+                    const detailRes = await fetch(`/api/snapshots/${snapshot.jobId}`);
+                    if (detailRes.ok) {
+                        const detail = await detailRes.json();
+                        
+                        // Convert to job format expected by renderHistoryContent
+                        jobs.set(snapshot.jobId, {
+                            id: snapshot.jobId,
+                            status: snapshot.status,
+                            startedAt: snapshot.startedAt,
+                            finishedAt: snapshot.finishedAt,
+                            selectedContainers: snapshot.selectedContainers || [],
+                            preState: detail.preState,
+                            postState: detail.postState,
+                            kind: snapshot.kind || 'execution'
+                        });
+                    }
+                } catch (err) {
+                    console.log(`Could not load snapshot ${snapshot.jobId}:`, err);
+                }
+            }
+            
+            if (jobs.size === 0) {
+                document.getElementById('history-content').innerHTML = `
+                    <div style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;">📜</div>
+                        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                            No execution history
+                        </h2>
+                        <p>Snapshots found, but could not load details</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Render the history
+            const html = this.renderHistoryContent(jobs, containers);
+            document.getElementById('history-content').innerHTML = html;
+            
+        } catch (err) {
+            console.error('Failed to load history:', err);
+            document.getElementById('history-content').innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--accent-red);">
+                    Failed to load history: ${err.message}
+                </div>
+            `;
         }
-        
+    },
+    
+    renderHistoryContent(jobs, containers) {
         // Group completed jobs by container
         const containerChanges = this.groupChangesByContainer(jobs);
         
@@ -142,31 +238,60 @@ window.TabsUI = {
     diffPorts(prePorts, postPorts) {
         const changes = {};
         
-        const preMap = new Map();
-        const postMap = new Map();
+        // Group ports by container
+        const preByContainer = {};
+        const postByContainer = {};
         
         for (const p of prePorts) {
+            if (!preByContainer[p.container]) preByContainer[p.container] = new Map();
             const key = `${p.containerPort}/${p.protocol}`;
-            preMap.set(key, p.host);
+            preByContainer[p.container].set(key, p.host);
         }
         
         for (const p of postPorts) {
+            if (!postByContainer[p.container]) postByContainer[p.container] = new Map();
             const key = `${p.containerPort}/${p.protocol}`;
-            postMap.set(key, p.host);
+            postByContainer[p.container].set(key, p.host);
+        }
+        
+        // Find changes per container
+        for (const [container, postMap] of Object.entries(postByContainer)) {
+            const preMap = preByContainer[container] || new Map();
             
-            const container = p.container;
-            if (!changes[container]) changes[container] = [];
+            for (const [key, newHost] of postMap.entries()) {
+                const oldHost = preMap.get(key);
+                
+                // Only include if there was an actual change
+                if (oldHost !== newHost) {
+                    if (!changes[container]) changes[container] = [];
+                    
+                    const [containerPort, protocol] = key.split('/');
+                    changes[container].push({
+                        containerPort: parseInt(containerPort),
+                        protocol,
+                        from: oldHost || 'none',
+                        to: newHost
+                    });
+                }
+            }
+        }
+        
+        // Also check for removed ports (in pre but not in post)
+        for (const [container, preMap] of Object.entries(preByContainer)) {
+            const postMap = postByContainer[container] || new Map();
             
-            const oldHost = preMap.get(key);
-            const newHost = p.host;
-            
-            if (oldHost !== newHost) {
-                changes[container].push({
-                    containerPort: p.containerPort,
-                    protocol: p.protocol,
-                    from: oldHost || 'none',
-                    to: newHost
-                });
+            for (const [key, oldHost] of preMap.entries()) {
+                if (!postMap.has(key)) {
+                    if (!changes[container]) changes[container] = [];
+                    
+                    const [containerPort, protocol] = key.split('/');
+                    changes[container].push({
+                        containerPort: parseInt(containerPort),
+                        protocol,
+                        from: oldHost,
+                        to: 'none'
+                    });
+                }
             }
         }
         

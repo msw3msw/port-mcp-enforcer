@@ -1,9 +1,17 @@
 {
   "name": "port-mcp-enforcer",
-  "version": "0.1.0",
-  "description": "Opt-in CLI-first Docker mutation client for Port-MCP",
-  "bin": {
-    "port-mcp-enforcer": "./bin/port-mcp-enforcer.js"
+  "version": "1.0.0",
+  "description": "Docker port management UI for Port-MCP",
+  "type": "commonjs",
+  "main": "src/ui/web/server.js",
+  "scripts": {
+    "start": "node src/ui/web/server.js"
   },
-  "type": "commonjs"
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/msw3msw/port-mcp-enforcer.git"
+  },
+  "author": "msw3msw",
+  "license": "MIT"
 }

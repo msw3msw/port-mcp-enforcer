@@ -1,0 +1,12 @@
+{
+  "jobId": "46b9daae-6ab0-4877-98f8-4ca43e7245c4",
+  "status": "completed",
+  "startedAt": 1767433053451,
+  "finishedAt": 1767433066892,
+  "duration": 13441,
+  "selectedContainers": [
+    "Glances"
+  ],
+  "dryRun": false,
+  "kind": "execution"
+}

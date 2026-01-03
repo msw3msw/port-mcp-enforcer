@@ -1,0 +1,36 @@
+# Node modules (will be installed in container)
+node_modules/
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Development files
+.env
+.env.local
+
+# Test files
+test/
+*.test.js
+
+# Snapshots (will be mounted as volume)
+snapshots/
+
+# Data directory (will be mounted as volume)
+data/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
