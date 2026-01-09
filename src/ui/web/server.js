@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer â€” Web UI Server (Authoritative Orchestrator)
+ * Port-MCP Enforcer  Web UI Server (Authoritative Orchestrator)
  * Location: src/ui/web/server.js
  *
  * Responsibilities:
@@ -107,6 +107,35 @@ function writeCategoryOverrides(obj) {
     const tmp = CATEGORY_OVERRIDES_FILE + ".tmp";
     fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
     fs.renameSync(tmp, CATEGORY_OVERRIDES_FILE);
+}
+
+/* ============================================================================
+   Exclusion Persistence (v1.1.0)
+============================================================================ */
+
+const EXCLUSIONS_FILE = path.join(DATA_DIR, "exclusions.json");
+
+function ensureExclusionsFile() {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(EXCLUSIONS_FILE)) {
+        fs.writeFileSync(EXCLUSIONS_FILE, JSON.stringify({ exclusions: [] }));
+    }
+}
+
+function readExclusions() {
+    ensureExclusionsFile();
+    try {
+        return JSON.parse(fs.readFileSync(EXCLUSIONS_FILE, "utf8"));
+    } catch {
+        return { exclusions: [] };
+    }
+}
+
+function writeExclusions(data) {
+    ensureExclusionsFile();
+    const tmp = EXCLUSIONS_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, EXCLUSIONS_FILE);
 }
 
 /* ============================================================================
@@ -256,18 +285,75 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* =====================================================================
+       Exclusions (v1.1.0)
+    ===================================================================== */
+
+    if (method === "GET" && parsed.pathname === "/api/exclusions") {
+        return json(res, 200, readExclusions());
+    }
+
+    if (method === "POST" && parsed.pathname === "/api/exclusions") {
+        let body = "";
+        req.on("data", c => (body += c));
+        req.on("end", () => {
+            let incoming;
+            try {
+                incoming = JSON.parse(body || "{}");
+            } catch {
+                return badRequest(res, "Invalid JSON");
+            }
+
+            writeExclusions(incoming);
+            return json(res, 200, incoming);
+        });
+        return;
+    }
+
+    /* =====================================================================
        GET /api/scan
     ===================================================================== */
 
     if (method === "GET" && parsed.pathname === "/api/scan") {
         try {
             const state = await loadState({
-                baseUrl: "http://127.0.0.1:4100"
+                baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
             });
             json(res, 200, state);
         } catch (err) {
             json(res, 500, { error: err.message });
         }
+        return;
+    }
+
+    /* =====================================================================
+       POST /api/check-ports  (Port Accessibility Check)
+    ===================================================================== */
+
+    if (method === "POST" && parsed.pathname === "/api/check-ports") {
+        let body = "";
+        req.on("data", chunk => (body += chunk));
+        req.on("end", async () => {
+            let input;
+            try {
+                input = JSON.parse(body || "{}");
+            } catch {
+                return badRequest(res, "Invalid JSON");
+            }
+
+            const { host, ports } = input;
+
+            if (!host || !Array.isArray(ports)) {
+                return badRequest(res, "host and ports[] are required");
+            }
+
+            try {
+                const { checkPorts } = require("./port-checker");
+                const results = await checkPorts(host, ports);
+                return json(res, 200, { success: true, results });
+            } catch (err) {
+                return json(res, 500, { error: err.message });
+            }
+        });
         return;
     }
 
@@ -296,7 +382,7 @@ const server = http.createServer(async (req, res) => {
 
             try {
                 const state = await loadState({
-                    baseUrl: "http://127.0.0.1:4100"
+                    baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
                 });
 
                 const classificationResult = classify(state, {
@@ -330,6 +416,51 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+
+    /* =====================================================================
+   POST /api/port-impact  (Port Change Impact Analysis)
+===================================================================== */
+
+if (method === "POST" && parsed.pathname === "/api/port-impact") {
+    let body = "";
+    req.on("data", chunk => (body += chunk));
+    req.on("end", async () => {
+        let input;
+        try {
+            input = JSON.parse(body || "{}");
+        } catch {
+            return badRequest(res, "Invalid JSON");
+        }
+
+        const { containerName, currentPort, newPort, alreadySuggested } = input;
+
+        if (!containerName || !currentPort) {
+            return badRequest(res, "containerName and currentPort are required");
+        }
+
+        try {
+            const { analyzePortChangeImpact } = require("../../planner/analyze/port-impact");
+            
+            const state = await loadState({
+                baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
+            });
+
+            const impact = analyzePortChangeImpact({
+                containerName,
+                currentPort: Number(currentPort),
+                newPort: newPort ? Number(newPort) : null,
+                state,
+                alreadySuggested: alreadySuggested || []
+            });
+
+            return json(res, 200, impact);
+        } catch (err) {
+            return json(res, 500, { error: err.message });
+        }
+    });
+    return;
+}
+
     /* =====================================================================
        POST /api/apply
     ===================================================================== */
@@ -350,7 +481,8 @@ const server = http.createServer(async (req, res) => {
                 categoryOverrides = {},
                 policyEnforcement = {},
                 allowDockerMutation,
-                dryRun
+                dryRun,
+                planObject
             } = input;
 
             const job = createJob({ selectedContainers });
@@ -361,26 +493,33 @@ const server = http.createServer(async (req, res) => {
                 pushJobEvent(job, { type: "job:planning:start", ts: Date.now() });
 
                 const preFull = await loadState({
-                    baseUrl: "http://127.0.0.1:4100"
+                    baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
                 });
                 job.preState = preFull;
 
-                const classification = classify(preFull, {
-                    overrides: categoryOverrides || {}
-                });
+                let executablePlan;
 
-                const plan = buildPlan({
-                    classification,
-                    state: preFull,
-                    overrides: categoryOverrides || {},
-                    policyEnforcement: policyEnforcement || {}
-                });
+                // Use provided plan if available (from modal), otherwise build from scratch
+                if (planObject && Array.isArray(planObject.actions)) {
+                    executablePlan = planObject;
+                } else {
+                    const classification = classify(preFull, {
+                        overrides: categoryOverrides || {}
+                    });
 
-                // Filter to only executable actions
-                const executablePlan = {
-                    ...plan,
-                    actions: plan.actions.filter(a => a.executable === true)
-                };
+                    const plan = buildPlan({
+                        classification,
+                        state: preFull,
+                        overrides: categoryOverrides || {},
+                        policyEnforcement: policyEnforcement || {}
+                    });
+
+                    // Filter to only executable actions
+                    executablePlan = {
+                        ...plan,
+                        actions: plan.actions.filter(a => a.executable === true)
+                    };
+                }
 
                 pushJobEvent(job, {
                     type: "plan:loaded",
@@ -399,7 +538,7 @@ const server = http.createServer(async (req, res) => {
                 });
 
                 const postFull = await loadState({
-                    baseUrl: "http://127.0.0.1:4100"
+                    baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
                 });
                 job.postState = postFull;
 
@@ -569,7 +708,7 @@ const server = http.createServer(async (req, res) => {
                     
                     // Capture current state before restore
                     const preFull = await loadState({
-                        baseUrl: "http://127.0.0.1:4100"
+                        baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
                     });
                     job.preState = preFull;
                     
@@ -592,7 +731,7 @@ const server = http.createServer(async (req, res) => {
                     
                     // Capture state after restore
                     const postFull = await loadState({
-                        baseUrl: "http://127.0.0.1:4100"
+                        baseUrl: process.env.PORT_MCP_URL || "http://127.0.0.1:4100"
                     });
                     job.postState = postFull;
                     

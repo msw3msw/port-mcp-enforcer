@@ -1,17 +1,9 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — Render Table UI (ENHANCED)
- * Location: src/ui/web/public/render-table-ui.js
- *
- * Responsibility:
- * - Render container rows
- * - Surface planner policy context (read-only)
- * - UI-only selection + intent (opt-in enforcement)
- *
- * HARD RULES:
- * - UI only
- * - No planner logic
- * - No mutation
+ * VERSION B: CHECKBOX COLUMN (Clear & Explicit)
+ * - Dedicated first column for exclusion checkboxes
+ * - Clear visual state with checkboxes
+ * - Traditional, familiar UI pattern
  * ============================================================================
  */
 
@@ -31,11 +23,21 @@ function renderContainersTable({
     plan,
     renderPorts
 }) {
+    // FIX: Use correct method name getExcluded() not getExclusions()
+    const excludedArray = window.ExclusionManager?.getExcluded() || [];
+    const exclusions = new Set(excludedArray);
+    
     let html = `
 <div class="panel">
 <table>
 <thead>
 <tr>
+  <th class="exclude-column-header">
+    <div class="exclude-header-content">
+      <span>🚫</span>
+      <span>EXCLUDE</span>
+    </div>
+  </th>
   <th>Apply</th>
   <th>Container</th>
   <th>Category</th>
@@ -51,11 +53,11 @@ function renderContainersTable({
         const name = c.name;
         const actions = actionsByContainer[name] || [];
         const ports = portsByContainer[name] || [];
+        const isExcluded = exclusions.has(name);
 
         const override = categoryOverrides[name];
         const confidence = override ? 1.0 : c.confidence;
 
-        // Check action.policyContext.status (not action.policyStatus)
         const blocking = actions.find(a => 
             a.policyContext?.status === "blocking"
         );
@@ -84,27 +86,18 @@ function renderContainersTable({
             title = formatPolicyTitle(policyInfo);
         }
 
-        /* ============================================================
-           Opt-in enforcement checkbox (UI ONLY)
-           
-           Show checkbox when:
-           1. Not blocking (no manual review required)
-           2. Enforceable action exists
-           3. Policy is actually enforceable
-           4. Not currently executing
-        ============================================================ */
-
         const showCheckbox =
             !blocking &&
             enforceable &&
             enforceable.policyContext?.enforceable === true &&
-            !isExecuting;
+            !isExecuting &&
+            !isExcluded;
 
         const applyCell = showCheckbox
             ? `<input type="checkbox"
                      class="apply-box"
                      data-container="${name}"
-                     title="Allow policy enforcement for this container (does not execute yet)"
+                     title="Allow policy enforcement for this container"
                      onchange="window.setPolicyEnforcementIntent('${name}', this.checked)">`
             : "";
 
@@ -115,13 +108,24 @@ function renderContainersTable({
             CONF_OVERRIDE_THRESHOLD
         });
 
+        // VERSION B: Dedicated checkbox column
+        // FIX: Use correct method name toggle() not toggleExclusion()
+        const excludeCheckbox = `
+            <input type="checkbox" 
+                   class="exclude-checkbox"
+                   ${isExcluded ? 'checked' : ''}
+                   onchange="window.ExclusionManager.toggle('${name}')"
+                   title="${isExcluded ? 'Click to include in automation' : 'Click to exclude from automation'}">
+        `;
+
         html += `
-<tr data-category="${c.category}">
+<tr data-category="${c.category}" data-container="${name}" class="${isExcluded ? 'row-excluded' : ''}">
+  <td class="exclude-column">${excludeCheckbox}</td>
   <td>${applyCell}</td>
-  <td>${name}</td>
+  <td><strong>${name}</strong></td>
   <td>${c.category}</td>
   <td>${confHtml}</td>
-  <td>${renderPorts(ports)}</td>
+  <td class="container-ports">${renderPorts(ports, c)}</td>
   <td class="${statusClass}" title="${escape(title)}">
     ${statusText}
   </td>
@@ -137,10 +141,6 @@ function renderContainersTable({
 
     return html;
 }
-
-/* ============================================================================
-   Confidence Rendering
-============================================================================ */
 
 function renderConfidenceCell({
     name,
@@ -182,14 +182,8 @@ function clickable(text, name, cls = "conf-med") {
 </span>`;
 }
 
-/* ============================================================================
-   Helpers
-============================================================================ */
-
 function formatPolicyTitle(action) {
     const parts = [];
-    
-    // Extract from policyContext
     const ctx = action.policyContext || {};
     
     if (ctx.id) parts.push(`Policy: ${ctx.id}`);

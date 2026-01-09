@@ -1,6 +1,35 @@
+# Dependencies
 node_modules/
+
+# Logs (all locations)
 *.log
 executor-audit.log
 webui.log
-.DS_Store
+src/ui/web/executor-audit.log
 
+# Runtime data (exclude snapshots and persistent data)
+snapshots/
+src/ui/web/data/
+
+# Legacy/old code
+src/ui/_legacy_ui_src/
+
+# System files
+.DS_Store
+.env
+
+# Editor directories
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.swp
+tree_full_with_sizes.txt
+executor-audit.log
+data/
+folder_layouy_files.txt
+modal-diagnostic.html
+src/ui/web/data/category-overrides.json

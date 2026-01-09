@@ -4,6 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Port-MCP Enforcer</title>
+  
+  <!-- Port Impact Modal Styles -->
+  <link rel="stylesheet" href="port-impact-modal.css">
+  
   <style>
     * {
       margin: 0;
@@ -78,14 +82,9 @@
     }
 
     .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+      width: 40px;
+      height: 40px;
       border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
       box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
     }
 
@@ -348,7 +347,7 @@
   <header>
     <div class="header-content">
       <h1>
-        <span class="logo-icon">🔒</span>
+        <img src="port-mcp-enforcer.png" alt="Port-MCP Enforcer" class="logo-icon" />
         Port-MCP Enforcer
       </h1>
       <button onclick="scan()">
@@ -382,7 +381,10 @@
   <!-- Tabs UI (history and rollback) -->
   <script src="tabs-ui.js"></script>
 
-  <!-- Containers table renderer (REQUIRED) -->
+  <!-- ✅ FIXED: Exclusion Manager MUST load BEFORE render-table-ui -->
+  <script src="modules/exclusion/exclusion-manager.js"></script>
+
+  <!-- Containers table renderer (uses ExclusionManager) -->
   <script src="render-table-ui.js"></script>
 
   <!-- Category overrides UI (REQUIRED) -->
@@ -391,8 +393,27 @@
   <!-- Rollback UI -->
   <script src="ui-rollback.js"></script>
 
-  <!-- Standardized containers tab (NEW) -->
+  <!-- Standardized containers tab (uses ExclusionManager) -->
   <script src="standardized-tab-ui.js"></script>
+
+  <!-- Enhanced Port Impact Modal (MODULAR) -->
+  <link rel="stylesheet" href="modules/port-impact/port-impact-modal-COMPLETE.css">
+  <script src="modules/port-impact/port-impact-modal-COMPLETE.js"></script>
+
+  <!-- Policy Enforcement Module (MODULAR) -->
+  <script src="modules/policy-enforcement/policy-enforcement-ui.js"></script>
+
+  <!-- Scan Orchestrator Module (MODULAR) -->
+  <script src="modules/scan/scan-orchestrator.js"></script>
+
+  <!-- Render Orchestrator Module (MODULAR) -->
+  <script src="modules/render/render-orchestrator.js"></script>
+
+  <!-- Port Renderer Module (MODULAR) -->
+  <script src="modules/render/port-renderer.js"></script>
+
+  <!-- Execution Orchestrator Module (MODULAR) -->
+  <script src="modules/execution/execution-orchestrator.js"></script>
 
   <!-- Main application logic -->
   <script src="app.js"></script>

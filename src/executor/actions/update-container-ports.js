@@ -1,17 +1,14 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — Executor Action: update-container-ports (HIGH RISK)
- * Location: src/executor/actions/update-container-ports.js
- *
- * Responsibility:
- * - Stop and recreate a container with updated published ports only
- *
- * HARD RULES:
- * - Ports-only changes (no image/env/volume/network modifications beyond what
- *   is required to recreate existing settings)
- * - No retries
- * - Fail fast
- * - Requires external gating (handled in executor)
+ * Port-MCP Enforcer – Executor Action: update-container-ports
+ * v1.0.8 - VPN Capabilities + Multi-Network Fix
+ * 
+ * FIXES:
+ * - Preserve --cap-add=NET_ADMIN (VPN routing)
+ * - Preserve --device /dev/net/tun (VPN tunnel)
+ * - Preserve --privileged mode
+ * - Preserve --sysctl settings
+ * - Handle multiple networks properly
  * ============================================================================
  */
 
@@ -30,7 +27,6 @@ function normProto(p) {
 }
 
 function portFlag(binding) {
-    // binding: { host, container, protocol }
     const proto = normProto(binding.protocol);
     if (!["tcp", "udp"].includes(proto)) {
         throw new Error(`invalid protocol "${binding.protocol}" (expected tcp/udp)`);
@@ -60,7 +56,6 @@ function extractPublishedPortsFromInspect(inspect) {
     const ports = [];
     const pb = inspect?.NetworkSettings?.Ports || {};
     for (const key of Object.keys(pb)) {
-        // key like "26900/udp"
         const [containerPortStr, proto] = key.split("/");
         const containerPort = Number(containerPortStr);
         const bindings = pb[key];
@@ -98,13 +93,20 @@ function buildCreateArgsFromInspect(inspect, newPortFlags) {
         }
     }
 
-    // network mode handling: if user-defined network, we will attach after create
-    // using --network is safe when a single network is present. Many containers
-    // are on one custom network; keep it simple and explicit.
+    // network mode - primary network
     const netMode = inspect?.HostConfig?.NetworkMode;
     if (netMode && netMode !== "default") {
-        // "bridge" should still be passed explicitly
         args.push("--network", netMode);
+    }
+    
+    // Collect additional networks for post-create connection
+    const networks = inspect?.NetworkSettings?.Networks || {};
+    const additionalNetworks = [];
+    
+    for (const netName of Object.keys(networks)) {
+        // Skip the primary network (already added via NetworkMode)
+        if (netName === netMode) continue;
+        additionalNetworks.push(netName);
     }
 
     // env
@@ -114,7 +116,6 @@ function buildCreateArgsFromInspect(inspect, newPortFlags) {
     // labels
     const labels = inspect?.Config?.Labels || {};
     for (const [k, v] of Object.entries(labels)) {
-        // preserve as-is
         args.push("--label", `${k}=${v}`);
     }
 
@@ -122,11 +123,9 @@ function buildCreateArgsFromInspect(inspect, newPortFlags) {
     const binds = inspect?.HostConfig?.Binds || [];
     for (const b of binds) args.push("-v", b);
 
-    // mounts (named volumes etc.)
+    // mounts (named volumes)
     const mounts = inspect?.Mounts || [];
     for (const m of mounts) {
-        // Skip bind mounts already represented in HostConfig.Binds.
-        // For named volumes, add -v source:dest[:mode]
         if (m.Type === "volume") {
             const mode = m.RW ? "rw" : "ro";
             args.push("-v", `${m.Name}:${m.Destination}:${mode}`);
@@ -138,15 +137,48 @@ function buildCreateArgsFromInspect(inspect, newPortFlags) {
         args.push("-w", inspect.Config.WorkingDir);
     }
 
-    // entrypoint
+    // entrypoint - FIXED: Use first element only, not joined
     if (Array.isArray(inspect?.Config?.Entrypoint) && inspect.Config.Entrypoint.length) {
-        args.push("--entrypoint", inspect.Config.Entrypoint.join(" "));
+        args.push("--entrypoint", inspect.Config.Entrypoint[0]);
     }
 
     // user
     if (inspect?.Config?.User) {
         args.push("-u", inspect.Config.User);
     }
+
+    // ========================================================================
+    // CRITICAL VPN FIXES - v1.0.8
+    // ========================================================================
+
+    // capabilities (CRITICAL for VPN - NET_ADMIN for routing)
+    const capAdd = inspect?.HostConfig?.CapAdd || [];
+    for (const cap of capAdd) {
+        args.push("--cap-add", cap);
+    }
+
+    // devices (CRITICAL for VPN - /dev/net/tun for tunnel)
+    const devices = inspect?.HostConfig?.Devices || [];
+    for (const dev of devices) {
+        if (dev.PathOnHost && dev.PathInContainer) {
+            args.push("--device", `${dev.PathOnHost}:${dev.PathInContainer}`);
+        }
+    }
+
+    // privileged mode
+    if (inspect?.HostConfig?.Privileged === true) {
+        args.push("--privileged");
+    }
+
+    // sysctls (kernel parameters for VPN)
+    const sysctls = inspect?.HostConfig?.Sysctls || {};
+    for (const [k, v] of Object.entries(sysctls)) {
+        args.push("--sysctl", `${k}=${v}`);
+    }
+
+    // ========================================================================
+    // END VPN FIXES
+    // ========================================================================
 
     // published ports (THIS IS THE MUTATION)
     for (const pf of newPortFlags) {
@@ -162,7 +194,7 @@ function buildCreateArgsFromInspect(inspect, newPortFlags) {
     const cmd = inspect?.Config?.Cmd || [];
     for (const c of cmd) args.push(c);
 
-    return args;
+    return { args, additionalNetworks };
 }
 
 module.exports = async function updateContainerPorts(action, opts = {}) {
@@ -208,16 +240,23 @@ module.exports = async function updateContainerPorts(action, opts = {}) {
         );
     }
 
-    // Stop → remove → recreate → start
+    // Stop → remove → recreate → reconnect networks → start
     const newPortFlags = action.to.map(portFlag);
 
     // Build docker create args from inspect with updated -p flags
-    const createArgs = buildCreateArgsFromInspect(inspect, newPortFlags);
+    const { args: createArgs, additionalNetworks } = buildCreateArgsFromInspect(inspect, newPortFlags);
 
     // IMPORTANT: remove old container only after stop
     await Docker.stop(name);
     await Docker.remove(name);
     await Docker.create(createArgs);
+    
+    // Reconnect additional networks before starting (v1.0.8)
+    for (const netName of additionalNetworks) {
+        console.log(`[executor] Reconnecting network: ${netName}`);
+        await Docker.runDocker(["network", "connect", netName, name]);
+    }
+    
     await Docker.start(name);
 
     return { status: "success", container: name };

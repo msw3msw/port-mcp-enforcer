@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — Layout Engine (UI-ONLY) - POLISHED
+ * Port-MCP Enforcer â€” Layout Engine (UI-ONLY) - POLISHED
  * Location: src/ui/web/public/layout.js
  *
  * Responsibility:
@@ -753,6 +753,110 @@ td:nth-child(5) a:hover {
   .panel {
     padding: 16px;
   }
+}
+
+/* =========================
+   Exclusion Feature (v1.1.0)
+========================= */
+
+/* Exclude column header */
+.exclude-column-header {
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+  background: rgba(255, 153, 102, 0.1) !important;
+  border-right: 2px solid rgba(255, 153, 102, 0.3);
+}
+
+.exclude-header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+}
+
+.exclude-column {
+  text-align: center;
+  background: rgba(255, 153, 102, 0.05);
+  border-right: 1px solid rgba(255, 153, 102, 0.2);
+}
+
+/* Excluded row styling */
+tbody tr.excluded,
+tbody tr.row-excluded {
+  background: rgba(255, 153, 102, 0.05);
+}
+
+tbody tr.excluded td,
+tbody tr.row-excluded td {
+  opacity: 0.7;
+}
+
+tbody tr.row-excluded td:first-child {
+  border-left: 3px solid var(--accent-orange) !important;
+}
+
+.exclude-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent-orange);
+  transition: transform 0.2s ease;
+}
+
+.exclude-checkbox:hover {
+  transform: scale(1.15);
+}
+
+.excluded-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255, 153, 102, 0.2);
+  color: var(--accent-orange);
+  border-radius: 3px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.strikethrough {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Excluded panel in Standardized tab */
+.excluded-panel {
+  background: linear-gradient(135deg, rgba(255, 153, 102, 0.05), transparent);
+  border-left: 4px solid var(--accent-orange);
+}
+
+.category-header-excluded {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px 0;
+  padding-left: 16px;
+  border-left: 4px solid var(--accent-orange);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-orange);
+}
+
+.status-excluded {
+  background: rgba(255, 153, 102, 0.15);
+  color: var(--accent-orange);
+  border: 1px solid rgba(255, 153, 102, 0.3);
+}
+
+.excluded-row {
+  background: rgba(255, 153, 102, 0.03);
+}
+
+.excluded-row:hover {
+  background: rgba(255, 153, 102, 0.08);
 }
 `;
     document.head.appendChild(style);

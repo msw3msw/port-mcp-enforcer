@@ -30,426 +30,305 @@ let lastExecutionJob = null;
 let liveEvents = [];
 
 /* ============================================================================
-   STEP 4C â€” Policy Enforcement Intent (UI-only, non-executing)
+   NOTE: PolicyEnforcementUI now loaded from modules/policy-enforcement/
 ============================================================================ */
 
-window.__policyEnforcementIntent = window.__policyEnforcementIntent || {};
+/* ============================================================================
+   Port Impact Modal (ENHANCED with Smart Suggestions)
+============================================================================ */
 
-window.PolicyEnforcementUI = {
-    getIntent() {
-        return window.__policyEnforcementIntent || {};
+window.PortImpactUI = {
+    currentSuggestion: null,
+
+    async show(containerName, portHost, portProto) {
+        const modal = document.createElement('div');
+        modal.id = 'port-impact-modal';
+        modal.innerHTML = `
+<div class="modal-overlay" onclick="window.PortImpactUI.close()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>ðŸ” Port Change Impact - ${containerName}</h3>
+            <button class="modal-close" onclick="window.PortImpactUI.close()">Ã—</button>
+        </div>
+        <div class="modal-body">
+            <div class="port-input-group">
+                <label>Current Port: <strong>${portHost}</strong> (${portProto.toUpperCase()})</label>
+                
+                <div id="suggestion-area" style="margin: 12px 0;">
+                    <div class="loading">Analyzing available ports...</div>
+                </div>
+                
+                <label>
+                    New Port: 
+                    <input type="number" id="new-port-input" min="1" max="65535" placeholder="Enter new port" />
+                </label>
+                <button onclick="window.PortImpactUI.analyze('${containerName}', ${portHost}, '${portProto}')">
+                    Analyze Impact
+                </button>
+            </div>
+            <div id="impact-results"></div>
+        </div>
+    </div>
+</div>
+`;
+        document.body.appendChild(modal);
+        
+        // Get suggestion immediately
+        await this.getSuggestion(containerName, portHost);
     },
-    isEnforced(containerName) {
-        return window.__policyEnforcementIntent?.[containerName] === true;
+
+    async getSuggestion(containerName, currentPort) {
+        try {
+            const res = await fetch('/api/port-impact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ containerName, currentPort, newPort: null })
+            });
+
+            const data = await res.json();
+            
+            if (data.success && data.suggestedPort) {
+                this.currentSuggestion = data.suggestedPort;
+                this.renderSuggestion(data);
+            } else {
+                document.getElementById('suggestion-area').innerHTML = 
+                    '<div class="warning">âš ï¸ No available ports in recommended range</div>';
+            }
+        } catch (err) {
+            document.getElementById('suggestion-area').innerHTML = 
+                '<div class="error">Could not get port suggestion</div>';
+        }
     },
-    set(containerName, enabled) {
-        if (!containerName) return;
-        if (enabled) window.__policyEnforcementIntent[containerName] = true;
-        else delete window.__policyEnforcementIntent[containerName];
-        plan().catch(() => {});
+
+    renderSuggestion(data) {
+        const suggestionHtml = `
+            <div class="port-suggestion">
+                <div class="suggestion-header">
+                    <span class="suggestion-icon">ðŸ’¡</span>
+                    <strong>Recommended Port</strong>
+                </div>
+                <div class="suggestion-content">
+                    <div class="suggested-port">${data.suggestedPort.port}</div>
+                    <div class="suggestion-details">
+                        ${data.category.toUpperCase()} range: ${data.suggestedPort.range}
+                    </div>
+                    <div class="suggestion-reason">${data.suggestedPort.reason}</div>
+                </div>
+                <button class="btn-use-suggested" onclick="window.PortImpactUI.useSuggested()">
+                    Use Recommended Port
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('suggestion-area').innerHTML = suggestionHtml;
     },
-    clearAll() {
-        window.__policyEnforcementIntent = {};
-        plan().catch(() => {});
+
+    useSuggested() {
+        if (this.currentSuggestion) {
+            document.getElementById('new-port-input').value = this.currentSuggestion.port;
+            document.getElementById('new-port-input').focus();
+        }
     },
-    count() {
-        return Object.keys(window.__policyEnforcementIntent || {}).length;
+
+    async analyze(containerName, currentPort, protocol) {
+        const newPortInput = document.getElementById('new-port-input');
+        const newPort = parseInt(newPortInput.value);
+        
+        if (!newPort || newPort < 1 || newPort > 65535) {
+            alert('Please enter a valid port number (1-65535)');
+            return;
+        }
+
+        const resultsDiv = document.getElementById('impact-results');
+        resultsDiv.innerHTML = '<div class="loading">Analyzing...</div>';
+
+        try {
+            const res = await fetch('/api/port-impact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ containerName, currentPort, newPort })
+            });
+
+            const impact = await res.json();
+            
+            if (!impact.success) {
+                resultsDiv.innerHTML = `<div class="error">${impact.error}</div>`;
+                return;
+            }
+
+            resultsDiv.innerHTML = this.renderImpact(impact);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="error">Analysis failed: ${err.message}</div>`;
+        }
+    },
+
+    renderImpact(impact) {
+        let html = '<div class="impact-report">';
+        
+        // Checks
+        html += '<div class="impact-section">';
+        html += '<h4>Status Checks</h4>';
+        html += `<div class="check ${impact.checks.portAvailable ? 'success' : 'error'}">
+            ${impact.checks.portAvailable ? 'âœ…' : 'âŒ'} Port ${impact.newPort} ${impact.checks.portAvailable ? 'is available' : 'is in use'}
+        </div>`;
+        html += `<div class="check ${impact.checks.hasPort ? 'success' : 'warning'}">
+            ${impact.checks.hasPort ? 'âœ…' : 'âš ï¸'} Container ${impact.checks.hasPort ? 'uses' : 'does not use'} port ${impact.currentPort}
+        </div>`;
+        html += '</div>';
+
+        // Warnings
+        if (impact.warnings && impact.warnings.length > 0) {
+            html += '<div class="impact-section warnings">';
+            html += '<h4>âš ï¸ Warnings</h4>';
+            impact.warnings.forEach(w => {
+                html += `<div class="warning">${w}</div>`;
+            });
+            html += '</div>';
+        }
+
+        // HIGH CONFIDENCE - Hardcoded port references (CRITICAL)
+        const highConfidenceContainers = impact.affectedContainers ? 
+            impact.affectedContainers.filter(c => c.priority === 'high') : [];
+        
+        if (highConfidenceContainers.length > 0) {
+            html += '<div class="impact-section critical">';
+            html += `<h4>ðŸ”´ ${highConfidenceContainers.length} Container(s) With HARDCODED Port References</h4>`;
+            html += `<div class="critical-note">âš ï¸ These containers have explicit references to port ${impact.currentPort} in their configuration and WILL BREAK if changed!</div>`;
+            
+            // Group by category
+            const byCategory = {};
+            highConfidenceContainers.forEach(c => {
+                const cat = c.category || 'unknown';
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(c);
+            });
+            
+            for (const [category, containers] of Object.entries(byCategory)) {
+                html += `<div class="category-group critical">`;
+                html += `<div class="category-label critical">${category.toUpperCase()} (${containers.length})</div>`;
+                containers.forEach(c => {
+                    html += `<div class="affected-container critical">
+                        <strong>ðŸ”´ ${c.name}</strong>
+                        <div class="reference-details">
+                            ${c.references ? c.references.map(ref => `
+                                <div class="reference-item">
+                                    <span class="ref-type">${ref.type.toUpperCase()}</span>
+                                    <code class="ref-detail">${this.escapeHtml(ref.detail)}</code>
+                                </div>
+                            `).join('') : `<div>${c.reason}</div>`}
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += '<div class="manual-note critical">ðŸ”´ CRITICAL: You MUST manually update these containers before changing the port!</div>';
+            html += '</div>';
+        }
+
+        // LOW CONFIDENCE - Network-based dependencies (INFORMATIONAL)
+        const lowConfidenceContainers = impact.affectedContainers ? 
+            impact.affectedContainers.filter(c => c.priority === 'low') : [];
+        
+        if (lowConfidenceContainers.length > 0) {
+            html += '<div class="impact-section affected">';
+            html += `<h4>ðŸ“¦ ${lowConfidenceContainers.length} Container(s) on Shared Network</h4>`;
+            html += `<div class="info-note">â„¹ï¸ These containers share a network but no hardcoded references were detected.</div>`;
+            
+            // Group by category
+            const byCategory = {};
+            lowConfidenceContainers.forEach(c => {
+                const cat = c.category || 'unknown';
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(c);
+            });
+            
+            for (const [category, containers] of Object.entries(byCategory)) {
+                html += `<div class="category-group">`;
+                html += `<div class="category-label">${category.toUpperCase()} (${containers.length})</div>`;
+                containers.forEach(c => {
+                    html += `<div class="affected-container">
+                        â€¢ <strong>${c.name}</strong> - ${c.reason}
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += '<div class="manual-note">ðŸ’¡ Review these containers - they may have configuration that references this port.</div>';
+            html += '</div>';
+        }
+
+        // No affected containers at all
+        if (!impact.affectedContainers || impact.affectedContainers.length === 0) {
+            html += '<div class="impact-section success">';
+            html += '<div class="check success">âœ… No containers appear to be affected</div>';
+            html += '</div>';
+        }
+
+        // Summary
+        html += '<div class="impact-summary">';
+        html += `<strong>Summary:</strong> `;
+        
+        if (highConfidenceContainers.length > 0) {
+            html += `ðŸ”´ CRITICAL: ${highConfidenceContainers.length} container(s) have hardcoded references that will break!`;
+        } else if (lowConfidenceContainers.length > 0) {
+            html += `âš ï¸ ${lowConfidenceContainers.length} container(s) on shared network - review recommended`;
+        } else if (impact.checks.portAvailable) {
+            html += 'âœ… Port change looks safe!';
+        } else if (!impact.checks.portAvailable) {
+            html += 'âŒ Port is not available';
+        }
+        
+        if (impact.summary && impact.summary.highConfidence > 0) {
+            html += `<div style="margin-top: 8px; color: #ff6b6b; font-weight: 600;">
+                You must update ${impact.summary.highConfidence} container(s) before proceeding!
+            </div>`;
+        }
+        
+        html += '</div>';
+
+        html += '</div>';
+        return html;
+    },
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    close() {
+        const modal = document.getElementById('port-impact-modal');
+        if (modal) modal.remove();
     }
 };
 
-window.setPolicyEnforcementIntent = (name, enabled) =>
-    window.PolicyEnforcementUI.set(name, enabled);
-window.clearPolicyEnforcementIntent = () =>
-    window.PolicyEnforcementUI.clearAll();
-
 /* ============================================================================
-   Scan â†’ Plan â†’ Render
+   Scan â†’ Plan â†’ Render (ENHANCED with Docker error detection)
 ============================================================================ */
 
-async function scan() {
-    await CategoryOverridesUI.loadPersistedOverrides();
+/* ============================================================================
+   NOTE: scan/plan now loaded from modules/scan/scan-orchestrator.js
+============================================================================ */
 
-    const out = document.getElementById("output");
-    if (out) out.textContent = "Scanning Docker...";
-
-    const res = await fetch("/api/scan");
-    lastScanData = await res.json();
-
-    // Also fetch recent jobs for history tab
-    await fetchRecentJobs();
-
-    await plan();
-}
-
-async function fetchRecentJobs() {
-    try {
-        // This endpoint would need to be added to server.js
-        // For now, we'll track jobs from apply operations
-        // In a real implementation, server would expose GET /api/jobs endpoint
-    } catch (err) {
-        console.log('Could not fetch job history:', err);
-    }
-}
-
-async function plan() {
-    const res = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            categoryOverrides: CategoryOverridesUI.categoryOverrides,
-            policyEnforcement: window.__policyEnforcementIntent
-        })
-    });
-
-    lastPlanData = await res.json();
-    render();
-}
 
 /* ============================================================================
    Render
 ============================================================================ */
 
-function render() {
-    const out = document.getElementById("output");
-    if (!out || !lastScanData || !lastPlanData) {
-        if (out) out.textContent = "No data.";
-        return;
-    }
-
-    const containers = lastScanData.containers.map(c => ({
-        name: c.name || c.container || c.id || "(unknown)",
-        category: lastPlanData.classification?.[c.name]?.category || "unknown",
-        confidence: lastPlanData.classification?.[c.name]?.confidence ?? null,
-        _raw: c
-    }));
-
-    const planObj = lastPlanData.plan || {};
-    const actions = Array.isArray(planObj.actions) ? planObj.actions : [];
-
-    const actionsByContainer = {};
-    for (const a of actions) {
-        if (!a?.container) continue;
-        (actionsByContainer[a.container] ||= []).push(a);
-    }
-
-    const portsByContainer = {};
-    for (const p of lastScanData.ports || []) {
-        if (!p?.container) continue;
-        (portsByContainer[p.container] ||= []).push(p);
-    }
-
-    // Filter out standardized containers from Overview
-    let containersForOverview = containers;
-    
-    if (window.StandardizedTabUI) {
-        const standardizedContainers = window.StandardizedTabUI.getStandardizedContainers(
-            containers,
-            portsByContainer,
-            CategoryOverridesUI.categoryOverrides
-        );
-        
-        const standardizedNames = new Set(standardizedContainers.map(c => c.name));
-        containersForOverview = containers.filter(c => !standardizedNames.has(c.name));
-    }
-
-    // Render tab bar
-    const tabBar = window.TabsUI ? window.TabsUI.renderTabBar() : '';
-    
-    // Render content based on active tab
-    let content = '';
-    
-    if (!window.TabsUI || window.TabsUI.currentTab === 'overview') {
-        // OVERVIEW TAB - Container table (excluding standardized)
-        const leftHtml = RenderTableUI.renderContainersTable({
-            containers: containersForOverview,  // Filtered list
-            portsByContainer,
-            actionsByContainer,
-            categoryOverrides: CategoryOverridesUI.categoryOverrides,
-            isExecuting,
-            CONF_OVERRIDE_THRESHOLD,
-            plan: planObj,
-            renderPorts,
-            openConfidenceOverride: CategoryOverridesUI.openCategoryOverride
-        });
-
-        /* ============================
-           Apply button gating + reason
-        ============================ */
-
-        // Get selected container names
-        const selectedContainers = new Set(
-            Object.keys(window.__policyEnforcementIntent || {}).filter(
-                k => window.__policyEnforcementIntent[k] === true
-            )
-        );
-
-        // Only check executable/blocking status for SELECTED containers
-        const selectedActions = actions.filter(a => 
-            selectedContainers.has(a.container)
-        );
-
-        const hasExecutable = selectedActions.some(a => a.executable === true);
-        const hasBlockingManual = selectedActions.some(
-            a => a.executable === false && a.type !== "no-op"
-        );
-
-        let applyDisabled = false;
-        let applyTitle = "";
-
-        if (isExecuting) {
-            applyDisabled = true;
-            applyTitle = "Execution in progress";
-        } else if (selectedContainers.size === 0) {
-            applyDisabled = true;
-            applyTitle = "No containers selected for enforcement";
-        } else if (!hasExecutable) {
-            applyDisabled = true;
-            applyTitle = "Selected containers have no executable actions";
-        } else if (hasBlockingManual) {
-            applyDisabled = true;
-            applyTitle =
-                "Apply disabled: selected containers require manual review";
-        }
-
-        const enforcementCount = PolicyEnforcementUI.count();
-
-        const rightHtml = `
-<div class="panel">
-  <h3>Execution Gates</h3>
-  <div class="gates">
-    <label><input type="checkbox" id="dryRunOnly"> Dry-run only</label>
-    <label><input type="checkbox" id="allowMutation"> Apply planned changes</label>
-    <input type="text" id="confirmText" placeholder="${CONFIRM_PHRASE}" size="36">
-  </div>
-
-  ${selectedContainers.size > 0 ? `
-  <div style="margin: 12px 0; padding: 12px; background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 6px; font-size: 12px;">
-    <strong style="color: #58a6ff;">Ready to execute:</strong>
-    <div style="margin-top: 6px;">
-      ${Array.from(selectedContainers).map(name => `
-        <div style="color: #e6edf3; margin: 2px 0;">• ${name}</div>
-      `).join('')}
-    </div>
-  </div>
-  ` : ''}
-
-  <button class="primary"
-          onclick="applySelected()"
-          ${applyDisabled ? "disabled" : ""}
-          title="${applyTitle}">
-    Apply Selected ${selectedContainers.size > 0 ? `(${selectedContainers.size})` : ''}
-  </button>
-</div>
-
-<div class="panel">
-  <h3>Policy Enforcement (Intent Only)</h3>
-  <div style="font-size: 13px;">
-    Selected for enforcement: <strong>${enforcementCount}</strong>
-  </div>
-  <div style="margin-top: 8px;">
-    <button onclick="clearPolicyEnforcementIntent()"
-            ${enforcementCount ? "" : "disabled"}>
-      Clear enforcement intent
-    </button>
-  </div>
-  <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">
-    This does not apply changes. It only records intent.
-  </div>
-</div>
-`;
-
-        content = Layout.render({ left: leftHtml, right: rightHtml });
-        
-    } else if (window.TabsUI && window.TabsUI.currentTab === 'standardized') {
-        // STANDARDIZED TAB - Show compliant containers only
-        if (window.StandardizedTabUI) {
-            content = window.StandardizedTabUI.renderStandardizedTab(
-                containers,
-                portsByContainer,
-                CategoryOverridesUI.categoryOverrides,
-                renderPorts
-            );
-        } else {
-            content = '<div class="panel">Standardized tab not loaded</div>';
-        }
-        
-    } else if (window.TabsUI && window.TabsUI.currentTab === 'history') {
-        // HISTORY TAB - Show execution history with rollback options
-        const historyHtml = window.TabsUI.renderHistoryView(
-            lastExecutionJobs || new Map(),
-            containers
-        );
-        content = historyHtml;
-    }
-
-    out.innerHTML = tabBar + content;
-}
-
 /* ============================================================================
-   Helpers
+   NOTE: render now loaded from modules/render/render-orchestrator.js
 ============================================================================ */
 
-function renderPorts(ports) {
-    if (!ports || !ports.length) return "-";
-
-    return ports.map(p => {
-        const host = p.host || '?';
-        const container = p.containerPort || '?';
-        const proto = p.protocol || 'tcp';
-        
-        // Format: host:container/proto with tooltip
-        const label = `<span style="color:#39d0d8;font-weight:600;">${host}</span>:<span style="color:#8b949e;">${container}</span>/<span style="opacity:0.7;font-size:11px;">${proto}</span>`;
-        
-        const title = `External: ${host} → Container: ${container} (${proto.toUpperCase()})`;
-        
-        return proto === "tcp"
-            ? `<a href="http://${HOST_IP}:${host}" target="_blank" title="${title}">${label}</a>`
-            : `<span title="${title}">${label}</span>`;
-    }).join("<br>");
-}
 
 /* ============================================================================
-   Apply
+   NOTE: renderPorts now loaded from modules/render/port-renderer.js
 ============================================================================ */
 
-async function applySelected() {
-    // Get selected containers from enforcement intent (not checkboxes)
-    const selectedContainers = Object.keys(
-        window.__policyEnforcementIntent || {}
-    ).filter(name => window.__policyEnforcementIntent[name] === true);
 
-    if (!selectedContainers.length) {
-        alert("No containers selected.");
-        return;
-    }
-
-    const dryRun = document.getElementById("dryRunOnly")?.checked;
-    const allowDockerMutation = document.getElementById("allowMutation")?.checked;
-
-    if (!dryRun && !allowDockerMutation) {
-        alert("Planned changes must be explicitly allowed.");
-        return;
-    }
-
-    const confirmText = document.getElementById("confirmText")?.value || "";
-    if (confirmText !== CONFIRM_PHRASE) {
-        alert("Typed confirmation phrase does not match.");
-        return;
-    }
-
-    isExecuting = true;
-    render();
-
-    const res = await fetch("/api/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            selectedContainers,
-            categoryOverrides: CategoryOverridesUI.categoryOverrides,
-            policyEnforcement: window.__policyEnforcementIntent,
-            allowDockerMutation,
-            dryRun,
-            confirmPhrase: confirmText
-        })
-    });
-
-    const payload = await res.json();
-    if (!payload?.jobId) {
-        isExecuting = false;
-        alert("Apply failed.");
-        render();
-        return;
-    }
-
-    activeJobId = payload.jobId;
-    
-    // Poll for job completion
-    await pollJobCompletion(payload.jobId);
-}
-
-async function pollJobCompletion(jobId) {
-    // Use SSE for live updates
-    const eventSource = new EventSource(`/api/jobs/${jobId}/events`);
-    
-    eventSource.onmessage = (event) => {
-        const evt = JSON.parse(event.data);
-        console.log('[Job Event]', evt);
-        
-        // Update UI with progress
-        if (evt.type === 'action:start') {
-            console.log(`Executing action ${evt.index + 1}/${evt.total}: ${evt.actionType} on ${evt.container}`);
-        }
-        
-        if (evt.type === 'job:completed') {
-            eventSource.close();
-            handleJobComplete(jobId, 'completed');
-        }
-        
-        if (evt.type === 'job:failed') {
-            eventSource.close();
-            handleJobComplete(jobId, 'failed', evt.error);
-        }
-    };
-    
-    eventSource.onerror = () => {
-        eventSource.close();
-        // Fallback to polling
-        pollJobCompletionFallback(jobId);
-    };
-}
-
-async function pollJobCompletionFallback(jobId) {
-    const maxAttempts = 60;
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-        try {
-            const res = await fetch(`/api/jobs/${jobId}`);
-            const job = await res.json();
-            
-            if (job.status === 'completed') {
-                handleJobComplete(jobId, 'completed');
-                return;
-            }
-            
-            if (job.status === 'failed') {
-                handleJobComplete(jobId, 'failed', job.error);
-                return;
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            attempts++;
-            
-        } catch (err) {
-            console.error('Job polling error:', err);
-            attempts++;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    }
-    
-    isExecuting = false;
-    alert('Job execution timeout - check server logs');
-    await scan();
-}
-
-async function handleJobComplete(jobId, status, error = null) {
-    const res = await fetch(`/api/jobs/${jobId}`);
-    const job = await res.json();
-    
-    // Store completed job for history tab
-    lastExecutionJobs.set(jobId, job);
-    
-    isExecuting = false;
-    
-    if (status === 'completed') {
-        alert(`Execution completed!\n\nJob ID: ${jobId}\n\nRefresh to see changes.`);
-    } else {
-        alert(`Execution failed!\n\nError: ${error || 'Unknown error'}`);
-    }
-    
-    // Refresh data
-    await scan();
-}
+/* ============================================================================
+   NOTE: applySelected/execution now loaded from modules/execution/execution-orchestrator.js
+============================================================================ */
 
 /* ============================================================================
    Auto-start

@@ -1,6 +1,9 @@
 # Port-MCP Enforcer - Dockerfile
 FROM node:20-alpine
 
+# Install Docker CLI (required for executor to interact with containers)
+RUN apk add --no-cache docker-cli
+
 # Set working directory
 WORKDIR /app
 
