@@ -1,15 +1,11 @@
 /**
  * ============================================================================
- * Port-MCP Enforcer — Standardized Tab UI (POLISHED with Sub-Tabs)
- * Location: src/ui/web/public/standardized-tab-ui.js
- *
- * FEATURES:
- * - Sub-tabs for Apps / Games / System / Excluded
- * - Horizontal port standards legend
- * - Clean, uncluttered view
- * - Progress summary always visible
+ * VERSION B: CHECKBOX COLUMN (Clear & Explicit) - Standardized Tab
+ * v1.0.4 - Fixed no-port container standardization
  * 
- * FIX: Unknown category containers are NEVER standardized
+ * - Dedicated checkbox column
+ * - Excluded containers in separate section
+ * - No-port containers with valid category + confidence are standardized
  * ============================================================================
  */
 
@@ -17,22 +13,17 @@
 
 window.StandardizedTabUI = {
     
-    // Current sub-tab
-    currentSubTab: 'apps',
-    
     PORT_RANGES: {
         system: { 
             ranges: [[1, 1023]], 
             label: "System",
             icon: "⚙️",
-            color: "#ff9966",
-            description: "Privileged ports"
+            description: "Privileged system ports"
         },
         apps: { 
             ranges: [[1024, 19999]], 
             label: "Apps",
             icon: "📱",
-            color: "#58a6ff",
             description: "Application services"
         },
         games: { 
@@ -42,26 +33,17 @@ window.StandardizedTabUI = {
             ], 
             label: "Games",
             icon: "🎮",
-            color: "#bc8cff",
-            description: "Game servers"
+            description: "Game servers (low: 7000-9999, high: 20000-39999)"
         },
         reserved: { 
             ranges: [[40000, 45000]], 
             label: "Reserved",
             icon: "🔒",
-            color: "#6e7681",
-            description: "Future use"
+            description: "Reserved for future use"
         }
     },
     
     DAEMON_PORTS: new Set([58846, 58946]),
-    
-    switchSubTab(tabName) {
-        this.currentSubTab = tabName;
-        if (typeof window.render === 'function') {
-            window.render();
-        }
-    },
     
     isPortCompliant(port, category) {
         const ranges = this.PORT_RANGES[category]?.ranges || [];
@@ -70,56 +52,60 @@ window.StandardizedTabUI = {
     
     isContainerStandardized(container, ports, categoryOverrides) {
         const name = container.name;
-        const category = categoryOverrides[name]?.category || container.category;
-        const confidence = categoryOverrides[name] ? 1.0 : container.confidence;
+        const hasOverride = categoryOverrides[name]?.category || categoryOverrides[name];
+        const category = (typeof hasOverride === 'string' ? hasOverride : hasOverride?.category) || container.category;
+        const confidence = hasOverride ? 1.0 : container.confidence;
         
-        // RULE 1: Unknown category = NEVER standardized (must be classified first)
-        if (!category || category === 'unknown') {
-            return false;
-        }
+        // Unknown category = never standardized
+        if (!category || category === 'unknown') return false;
         
-        // RULE 2: Low confidence = NEVER standardized (needs manual review)
-        if (confidence < 0.9) {
-            return false;
-        }
-        
-        // RULE 3: System category = always standardized (protected)
+        // System category = always standardized (protected)
         if (category === 'system') {
             return true;
         }
         
-        // RULE 4: Running with no exposed ports = standardized (internal service)
-        const isRunning = container._raw?.running || container._raw?.state === 'running';
-        if (isRunning && (!ports || ports.length === 0)) {
-            return true;
-        }
-        
-        // RULE 5: Must have ports to check compliance
+        // v1.0.4 FIX: No exposed ports with valid category + high confidence = standardized
+        // This handles containers like binhex-plexpass that use host networking
+        // or internal-only services that don't expose ports
         if (!ports || ports.length === 0) {
+            // If user explicitly set category (override), trust them
+            if (hasOverride && confidence >= 0.9) {
+                return true;
+            }
+            // If running with no ports, also consider standardized
+            const isRunning = container._raw?.running || container._raw?.state === 'running';
+            if (isRunning && confidence >= 0.9) {
+                return true;
+            }
+            // Otherwise, needs manual review
             return false;
         }
         
-        // RULE 6: Check port compliance based on category
+        // Low confidence = needs manual review
+        if (confidence < 0.9) return false;
+        
         const tcpPorts = ports.filter(p => p.protocol === 'tcp');
         const udpPorts = ports.filter(p => p.protocol === 'udp');
         
+        // Games: all ports must be in game ranges
         if (category === 'games') {
             const allPorts = [...tcpPorts, ...udpPorts];
-            if (allPorts.length === 0) return false;
+            if (allPorts.length === 0) return true; // No ports to check
             return allPorts.every(p => this.isPortCompliant(p.host, category));
         }
         
-        // Apps: Check TCP ports (ignore daemon ports)
+        // Apps: TCP ports must be in app range (ignoring daemon ports)
         const relevantTcpPorts = tcpPorts.filter(p => !this.DAEMON_PORTS.has(p.host));
         
+        // Only daemon ports = standardized (VPN containers)
         if (relevantTcpPorts.length === 0 && tcpPorts.length > 0) {
-            return true; // Only daemon ports - OK
+            return true;
         }
         
-        if (relevantTcpPorts.length === 0) {
-            return false;
-        }
+        // No relevant ports to check = standardized
+        if (relevantTcpPorts.length === 0) return true;
         
+        // Check all relevant ports are compliant
         return relevantTcpPorts.every(p => this.isPortCompliant(p.host, category));
     },
     
@@ -130,15 +116,28 @@ window.StandardizedTabUI = {
             const ports = portsByContainer[container.name] || [];
             
             if (this.isContainerStandardized(container, ports, categoryOverrides)) {
+                const hasOverride = categoryOverrides[container.name]?.category || categoryOverrides[container.name];
+                const effectiveCategory = (typeof hasOverride === 'string' ? hasOverride : hasOverride?.category) || container.category;
+                
                 standardized.push({
                     ...container,
                     ports,
-                    effectiveCategory: categoryOverrides[container.name]?.category || container.category
+                    effectiveCategory
                 });
             }
         }
         
         return standardized;
+    },
+    
+    // Track active sub-tab
+    activeSubTab: 'all',
+    
+    setSubTab(tab) {
+        this.activeSubTab = tab;
+        if (typeof window.render === 'function') {
+            window.render();
+        }
     },
     
     renderStandardizedTab(containers, portsByContainer, categoryOverrides, renderPorts) {
@@ -148,144 +147,107 @@ window.StandardizedTabUI = {
             categoryOverrides
         );
         
-        const exclusions = new Set(window.ExclusionManager?.getExcluded() || []);
+        const exclusions = window.ExclusionManager?.getExcluded() || [];
+        const exclusionSet = new Set(exclusions);
         
-        // Standardized containers that are NOT excluded
-        const nonExcluded = standardized.filter(c => !exclusions.has(c.name));
+        // Standardized but not excluded
+        const nonExcluded = standardized.filter(c => !exclusionSet.has(c.name));
         
-        // ALL excluded containers (regardless of standardization status)
-        const allExcluded = containers.filter(c => exclusions.has(c.name)).map(c => ({
-            ...c,
-            ports: portsByContainer[c.name] || [],
-            effectiveCategory: categoryOverrides[c.name]?.category || c.category
-        }));
-        
-        // Group by category
-        const byCategory = this.groupByCategory(nonExcluded);
+        // ALL excluded containers (not just standardized ones)
+        const allExcluded = containers.filter(c => exclusionSet.has(c.name)).map(c => {
+            const hasOverride = categoryOverrides[c.name]?.category || categoryOverrides[c.name];
+            const effectiveCategory = (typeof hasOverride === 'string' ? hasOverride : hasOverride?.category) || c.category;
+            return {
+                ...c,
+                ports: portsByContainer[c.name] || [],
+                effectiveCategory
+            };
+        });
         
         const total = containers.length;
-        const standardizedCount = nonExcluded.length;  // Only count non-excluded standardized
+        const standardizedCount = standardized.length;
         const excludedCount = allExcluded.length;
-        // Progress = standardized + excluded (both are "done")
-        const doneCount = standardizedCount + excludedCount;
+        
+        // Progress = standardized (not excluded) + excluded
+        const doneCount = nonExcluded.length + excludedCount;
         const percentage = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+        
+        // Group by category for sub-tabs
+        const byCategory = this.groupByCategory(nonExcluded);
         
         let html = '<div class="standardized-view">';
         
-        // Compact horizontal legend
-        html += this.renderHorizontalLegend();
-        
-        // Progress bar
-        html += this.renderProgress(total, standardizedCount, excludedCount, percentage, byCategory);
-        
-        // Sub-tabs
+        html += this.renderLegend();
+        html += this.renderProgress(total, nonExcluded.length, excludedCount, percentage);
         html += this.renderSubTabs(byCategory, allExcluded);
         
-        // Content based on current sub-tab
-        html += this.renderSubTabContent(byCategory, allExcluded, renderPorts);
+        // Render content based on active sub-tab
+        if (this.activeSubTab === 'all') {
+            for (const [category, items] of Object.entries(byCategory)) {
+                if (items.length > 0) {
+                    html += this.renderCategorySection(category, items, renderPorts);
+                }
+            }
+            if (allExcluded.length > 0) {
+                html += this.renderExcludedSection(allExcluded, renderPorts);
+            }
+        } else if (this.activeSubTab === 'excluded') {
+            if (allExcluded.length > 0) {
+                html += this.renderExcludedSection(allExcluded, renderPorts);
+            } else {
+                html += '<div class="panel" style="text-align: center; padding: 2rem; opacity: 0.7;">No excluded containers</div>';
+            }
+        } else {
+            const items = byCategory[this.activeSubTab] || [];
+            if (items.length > 0) {
+                html += this.renderCategorySection(this.activeSubTab, items, renderPorts);
+            } else {
+                html += `<div class="panel" style="text-align: center; padding: 2rem; opacity: 0.7;">No ${this.activeSubTab} containers standardized yet</div>`;
+            }
+        }
+        
+        if (nonExcluded.length === 0 && allExcluded.length === 0) {
+            html += this.renderEmptyState();
+        }
         
         html += '</div>';
         
         return html;
     },
     
-    renderHorizontalLegend() {
-        return `
-<div class="panel" style="padding: 16px;">
-    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-        <span style="font-size: 16px;">📋</span>
-        <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Port Assignment Standards</h3>
-    </div>
-    
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
-        ${Object.entries(this.PORT_RANGES).map(([key, range]) => `
-            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; border-left: 3px solid ${range.color};">
-                <span style="font-size: 16px;">${range.icon}</span>
-                <div>
-                    <div style="font-weight: 600; font-size: 12px; color: ${range.color};">${range.label}</div>
-                    <div style="font-size: 11px; opacity: 0.7;">
-                        ${range.ranges.map(([min, max]) => `${min}-${max}`).join(' / ')}
-                    </div>
-                </div>
-            </div>
-        `).join('')}
-    </div>
-    
-    <div style="display: flex; gap: 24px; padding: 8px 12px; background: rgba(88, 166, 255, 0.05); border-radius: 6px; font-size: 11px;">
-        <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="color: #39d0d8; font-size: 14px;">●</span>
-            <span>Teal = Web UI (HTML)</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="color: #8b949e; font-size: 14px;">●</span>
-            <span>Gray = API / Backend / Game</span>
-        </div>
-    </div>
-</div>
-`;
-    },
-    
-    renderProgress(total, standardized, excluded, percentage, byCategory) {
-        const remaining = total - standardized - excluded;
-        const barWidth = Math.min(percentage, 100);
-        
-        return `
-<div class="panel" style="padding: 16px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-        <h3 style="margin: 0; font-size: 14px;">📊 Standardization Progress</h3>
-        <span style="font-size: 24px; font-weight: 700; color: #3fb950;">${percentage}%</span>
-    </div>
-    
-    <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
-        <div style="height: 100%; width: ${barWidth}%; background: linear-gradient(90deg, #3fb950, #2ecc71); border-radius: 4px; transition: width 0.3s ease;"></div>
-    </div>
-    
-    <div style="display: flex; gap: 16px; font-size: 12px;">
-        <div><strong style="color: #3fb950;">${standardized}</strong> <span style="opacity: 0.7;">Standardized</span></div>
-        <div><strong style="color: #ff9966;">${excluded}</strong> <span style="opacity: 0.7;">Excluded</span></div>
-        <div><strong style="color: #f85149;">${remaining}</strong> <span style="opacity: 0.7;">Remaining</span></div>
-        <div style="margin-left: auto; opacity: 0.7;">
-            📱 ${byCategory.apps?.length || 0} Apps • 
-            🎮 ${byCategory.games?.length || 0} Games • 
-            ⚙️ ${byCategory.system?.length || 0} System
-        </div>
-    </div>
-</div>
-`;
-    },
-    
     renderSubTabs(byCategory, excluded) {
         const tabs = [
-            { id: 'apps', label: 'Apps', icon: '📱', count: byCategory.apps?.length || 0, color: '#58a6ff' },
-            { id: 'games', label: 'Games', icon: '🎮', count: byCategory.games?.length || 0, color: '#bc8cff' },
-            { id: 'system', label: 'System', icon: '⚙️', count: byCategory.system?.length || 0, color: '#ff9966' },
-            { id: 'excluded', label: 'Excluded', icon: '🚫', count: excluded.length, color: '#f85149' }
+            { id: 'all', label: 'All', icon: '📋', count: Object.values(byCategory).flat().length + excluded.length },
+            { id: 'apps', label: 'Apps', icon: '📱', count: (byCategory.apps || []).length },
+            { id: 'games', label: 'Games', icon: '🎮', count: (byCategory.games || []).length },
+            { id: 'system', label: 'System', icon: '⚙️', count: (byCategory.system || []).length },
+            { id: 'excluded', label: 'Excluded', icon: '🚫', count: excluded.length }
         ];
         
         return `
-<div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border-color); padding-bottom: 0;">
+<div class="sub-tab-bar" style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
     ${tabs.map(tab => `
-        <button onclick="window.StandardizedTabUI.switchSubTab('${tab.id}')"
+        <button class="sub-tab-button ${this.activeSubTab === tab.id ? 'active' : ''}" 
+                onclick="window.StandardizedTabUI.setSubTab('${tab.id}')"
                 style="
+                    background: ${this.activeSubTab === tab.id ? 'rgba(88, 166, 255, 0.2)' : 'var(--bg-tertiary)'};
+                    border: 1px solid ${this.activeSubTab === tab.id ? 'var(--accent-blue)' : 'var(--border-color)'};
+                    color: ${this.activeSubTab === tab.id ? 'var(--accent-blue)' : 'var(--text-secondary)'};
+                    padding: 8px 16px;
+                    border-radius: 6px;
+                    cursor: pointer;
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    padding: 12px 20px;
-                    background: ${this.currentSubTab === tab.id ? 'rgba(88, 166, 255, 0.1)' : 'transparent'};
-                    border: none;
-                    border-bottom: 3px solid ${this.currentSubTab === tab.id ? tab.color : 'transparent'};
-                    color: ${this.currentSubTab === tab.id ? tab.color : 'var(--text-secondary)'};
-                    cursor: pointer;
                     font-size: 13px;
                     font-weight: 600;
                     transition: all 0.2s ease;
-                    margin-bottom: -2px;
                 ">
             <span>${tab.icon}</span>
             <span>${tab.label}</span>
             <span style="
-                background: ${this.currentSubTab === tab.id ? tab.color : 'var(--bg-tertiary)'};
-                color: ${this.currentSubTab === tab.id ? '#fff' : 'var(--text-secondary)'};
+                background: ${this.activeSubTab === tab.id ? 'var(--accent-blue)' : 'rgba(255,255,255,0.1)'};
+                color: ${this.activeSubTab === tab.id ? 'white' : 'var(--text-muted)'};
                 padding: 2px 8px;
                 border-radius: 10px;
                 font-size: 11px;
@@ -296,149 +258,67 @@ window.StandardizedTabUI = {
 `;
     },
     
-    renderSubTabContent(byCategory, excluded, renderPorts) {
-        switch (this.currentSubTab) {
-            case 'apps':
-                return this.renderCategoryContent(byCategory.apps || [], 'apps', renderPorts);
-            case 'games':
-                return this.renderCategoryContent(byCategory.games || [], 'games', renderPorts);
-            case 'system':
-                return this.renderCategoryContent(byCategory.system || [], 'system', renderPorts);
-            case 'excluded':
-                return this.renderExcludedContent(excluded, renderPorts);
-            default:
-                return this.renderCategoryContent(byCategory.apps || [], 'apps', renderPorts);
-        }
-    },
-    
-    renderCategoryContent(containers, category, renderPorts) {
-        if (containers.length === 0) {
-            const info = this.PORT_RANGES[category] || { icon: '❓', label: category };
-            return `
-<div class="panel" style="text-align: center; padding: 48px 24px;">
-    <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">${info.icon}</div>
-    <h3 style="margin: 0 0 8px 0; color: var(--text-primary);">No ${info.label} Containers</h3>
-    <p style="color: var(--text-secondary); font-size: 13px;">
-        No standardized containers in this category yet.
-    </p>
-</div>
-`;
-        }
-        
+    renderLegend() {
         return `
-<div class="panel" style="padding: 0; overflow: hidden;">
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background: var(--bg-tertiary);">
-                <th style="padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Container</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Ports</th>
-                <th style="padding: 12px 16px; text-align: center; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Status</th>
-                <th style="padding: 12px 16px; text-align: center; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Exclude</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${containers.map(c => this.renderContainerRow(c, renderPorts)).join('')}
-        </tbody>
-    </table>
-</div>
-`;
-    },
-    
-    renderContainerRow(container, renderPorts) {
-        const ports = container.ports || [];
-        
-        return `
-<tr style="border-bottom: 1px solid var(--border-color);" data-container="${container.name}">
-    <td style="padding: 12px 16px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="color: #3fb950;">✓</span>
-            <strong>${container.name}</strong>
+<div class="panel legend-panel" style="padding: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+            ${Object.entries(this.PORT_RANGES).map(([key, range]) => `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">${range.icon}</span>
+                    <strong style="font-size: 12px;">${range.label}</strong>
+                    <code style="font-size: 11px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${range.ranges.map(([min, max]) => `${min}-${max}`).join(' / ')}</code>
+                </div>
+            `).join('')}
         </div>
-    </td>
-    <td style="padding: 12px 16px;" class="container-ports">
-        ${renderPorts(ports, container)}
-    </td>
-    <td style="padding: 12px 16px; text-align: center;">
-        <span style="
-            display: inline-block;
-            padding: 4px 12px;
-            background: rgba(63, 185, 80, 0.1);
-            color: #3fb950;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        ">✅ Compliant</span>
-    </td>
-    <td style="padding: 12px 16px; text-align: center;">
-        <input type="checkbox" 
-               style="width: 16px; height: 16px; cursor: pointer; accent-color: #ff9966;"
-               onchange="window.ExclusionManager.toggle('${container.name}')"
-               title="Exclude from automation">
-    </td>
-</tr>
-`;
-    },
-    
-    renderExcludedContent(excluded, renderPorts) {
-        if (excluded.length === 0) {
-            return `
-<div class="panel" style="text-align: center; padding: 48px 24px;">
-    <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">✅</div>
-    <h3 style="margin: 0 0 8px 0; color: var(--text-primary);">No Excluded Containers</h3>
-    <p style="color: var(--text-secondary); font-size: 13px;">
-        All standardized containers are included in automation.
-    </p>
-</div>
-`;
-        }
-        
-        return `
-<div class="panel" style="border-left: 3px solid #ff9966; padding: 0; overflow: hidden;">
-    <div style="padding: 12px 16px; background: rgba(255, 153, 102, 0.05); border-bottom: 1px solid var(--border-color);">
-        <p style="margin: 0; font-size: 12px; color: var(--text-secondary);">
-            These containers are excluded from automation. <strong>Uncheck to include them again.</strong>
-        </p>
+        <div style="display: flex; align-items: center; gap: 16px; font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #39d0d8; font-weight: 600;">●</span>
+                <span>Web UI</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #8b949e; font-weight: 600;">●</span>
+                <span>API/Backend</span>
+            </div>
+        </div>
     </div>
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background: var(--bg-tertiary);">
-                <th style="padding: 12px 16px; text-align: center; font-size: 11px; text-transform: uppercase; color: var(--text-secondary); width: 80px;">Include</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Container</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Category</th>
-                <th style="padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-secondary);">Ports</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${excluded.map(c => this.renderExcludedRow(c, renderPorts)).join('')}
-        </tbody>
-    </table>
 </div>
 `;
     },
     
-    renderExcludedRow(container, renderPorts) {
-        const ports = container.ports || [];
-        const catInfo = this.PORT_RANGES[container.effectiveCategory] || { icon: '❓', color: '#6e7681' };
+    renderProgress(total, standardized, excluded, percentage) {
+        const remaining = total - standardized - excluded;
+        const barWidth = Math.min(percentage, 100);
         
         return `
-<tr style="border-bottom: 1px solid var(--border-color); background: rgba(255, 153, 102, 0.02);" data-container="${container.name}">
-    <td style="padding: 12px 16px; text-align: center;">
-        <input type="checkbox" 
-               checked
-               style="width: 16px; height: 16px; cursor: pointer; accent-color: #3fb950;"
-               onchange="window.ExclusionManager.toggle('${container.name}')"
-               title="Click to include in automation">
-    </td>
-    <td style="padding: 12px 16px;">
-        <strong>${container.name}</strong>
-    </td>
-    <td style="padding: 12px 16px;">
-        <span style="color: ${catInfo.color};">${catInfo.icon} ${container.effectiveCategory}</span>
-    </td>
-    <td style="padding: 12px 16px;" class="container-ports">
-        ${renderPorts(ports, container)}
-    </td>
-</tr>
+<div class="panel progress-panel" style="padding: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">📊</span>
+            <strong style="font-size: 14px;">Progress</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 24px;">
+            <div style="text-align: center;">
+                <span style="font-size: 20px; font-weight: 700; color: var(--accent-green);">${standardized}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 4px;">Standardized</span>
+            </div>
+            <div style="text-align: center;">
+                <span style="font-size: 20px; font-weight: 700; color: var(--accent-orange);">${excluded}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 4px;">Excluded</span>
+            </div>
+            <div style="text-align: center;">
+                <span style="font-size: 20px; font-weight: 700; color: var(--text-secondary);">${remaining}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 4px;">Remaining</span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; min-width: 200px;">
+            <div class="progress-bar" style="flex: 1; height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                <div class="progress-fill" style="width: ${barWidth}%; height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-blue)); border-radius: 4px;"></div>
+            </div>
+            <span style="font-size: 16px; font-weight: 700; color: var(--accent-blue);">${percentage}%</span>
+        </div>
+    </div>
+</div>
 `;
     },
     
@@ -460,6 +340,136 @@ window.StandardizedTabUI = {
         }
         
         return groups;
+    },
+    
+    renderCategorySection(category, containers, renderPorts) {
+        const info = this.PORT_RANGES[category] || { icon: '❓', label: category };
+        
+        return `
+<div class="panel category-panel">
+    <h3 class="category-header-standardized">
+        <span class="category-icon">${info.icon}</span>
+        ${info.label.toUpperCase()}
+        <span class="category-count">${containers.length}</span>
+    </h3>
+    
+    <table class="standardized-table">
+        <thead>
+            <tr>
+                <th>Container</th>
+                <th>Category</th>
+                <th>Ports</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${containers.map(c => this.renderContainerRow(c, renderPorts)).join('')}
+        </tbody>
+    </table>
+</div>
+`;
+    },
+    
+    renderContainerRow(container, renderPorts) {
+        const ports = container.ports || [];
+        const portsDisplay = ports.length === 0 
+            ? '<span style="opacity: 0.5; font-style: italic;">No exposed ports</span>'
+            : renderPorts(ports, container);
+        
+        return `
+<tr class="standardized-row" data-container="${container.name}">
+    <td class="container-name">
+        <span class="checkmark">✓</span>
+        <strong>${container.name}</strong>
+    </td>
+    <td class="container-category">${container.effectiveCategory}</td>
+    <td class="container-ports">${portsDisplay}</td>
+    <td class="container-status">
+        <span class="status-badge status-compliant">✅ Compliant</span>
+    </td>
+</tr>
+`;
+    },
+    
+    renderExcludedSection(excluded, renderPorts) {
+        return `
+<div class="panel excluded-panel">
+    <h3 class="excluded-header">
+        <span class="excluded-icon">🚫</span>
+        EXCLUDED CONTAINERS
+        <span class="category-count">${excluded.length}</span>
+    </h3>
+    
+    <div class="excluded-note">
+        These containers are excluded from automation but count toward progress.
+        <strong>Uncheck the box to include them again.</strong>
+    </div>
+    
+    <table class="standardized-table">
+        <thead>
+            <tr>
+                <th class="exclude-column-header" style="background: rgba(63, 185, 80, 0.1); border-right: 2px solid rgba(63, 185, 80, 0.3);">
+                    <div class="exclude-header-content">
+                        <span>✅</span>
+                        <span>INCLUDE</span>
+                    </div>
+                </th>
+                <th>Container</th>
+                <th>Category</th>
+                <th>Ports</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${excluded.map(c => this.renderExcludedRow(c, renderPorts)).join('')}
+        </tbody>
+    </table>
+</div>
+`;
+    },
+    
+    renderExcludedRow(container, renderPorts) {
+        const ports = container.ports || [];
+        const portsDisplay = ports.length === 0 
+            ? '<span style="opacity: 0.5; font-style: italic;">No exposed ports</span>'
+            : renderPorts(ports, container);
+        
+        const excludeCheckbox = `
+            <input type="checkbox" 
+                   class="exclude-checkbox"
+                   checked
+                   onchange="window.ExclusionManager.toggle('${container.name}')"
+                   title="Click to include in automation">
+        `;
+        
+        return `
+<tr class="excluded-row" data-container="${container.name}">
+    <td class="exclude-column">${excludeCheckbox}</td>
+    <td class="container-name">
+        <strong>${container.name}</strong>
+    </td>
+    <td class="container-category">${container.effectiveCategory}</td>
+    <td class="container-ports">${portsDisplay}</td>
+    <td class="container-status">
+        <span class="status-badge status-excluded">🚫 Excluded</span>
+    </td>
+</tr>
+`;
+    },
+    
+    renderEmptyState() {
+        return `
+<div class="panel empty-state">
+    <div class="empty-state-content">
+        <div class="empty-icon">📋</div>
+        <h2>No Standardized Containers Yet</h2>
+        <p>Execute changes in the Overview tab to see compliant containers appear here.</p>
+        <button onclick="window.TabsUI.switchTab('overview')" class="btn-primary">
+            ← Go to Overview
+        </button>
+    </div>
+</div>
+`;
     },
     
     formatRelativeTime(timestamp) {

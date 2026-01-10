@@ -2,26 +2,106 @@
   "Glances": {
     "category": "apps",
     "source": "user",
-    "setAt": 1767412240907
+    "setAt": 1767562873509
   },
   "satisfactory-server": {
     "category": "games",
     "source": "user",
-    "setAt": 1767412240907
+    "setAt": 1767562873509
   },
   "tautulli": {
     "category": "apps",
     "source": "user",
-    "setAt": 1767412240907
+    "setAt": 1767562873509
   },
   "7dtd-server": {
     "category": "games",
     "source": "user",
-    "setAt": 1767412240907
+    "setAt": 1767562873509
   },
   "minecraft-server": {
     "category": "games",
     "source": "user",
-    "setAt": 1767412240907
+    "setAt": 1767562873509
+  },
+  "bazarr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-prowlarr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-radarr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-sabnzbd": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "arr-dashboard": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "sonarr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-overseerr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-delugevpn": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "Icarus": {
+    "category": "games",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "conan-server": {
+    "category": "games",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "UnraidConfigGuardian": {
+    "category": "system",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "dockersocket": {
+    "category": "system",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "port-mcp": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "port-mcp-enforcer": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "Huntarr": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
+  },
+  "binhex-plexpass": {
+    "category": "apps",
+    "source": "user",
+    "setAt": 1767562873509
   }
 }

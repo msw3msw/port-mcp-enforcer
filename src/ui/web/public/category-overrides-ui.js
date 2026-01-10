@@ -3,10 +3,13 @@
  * CategoryOverridesUI
  * Location: src/ui/web/public/category-overrides-ui.js
  *
+ * v1.0.4 - Auto-refresh fix
+ *
  * Responsibility:
  * - Manage UI-only category overrides
  * - Persist overrides via API
  * - Expose override selector
+ * - Trigger re-plan after category change (not just re-render)
  *
  * HARD RULES:
  * - UI only
@@ -71,7 +74,12 @@ ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
 
             await CategoryOverridesUI.persistOverrides();
 
-            if (typeof window.render === "function") {
+            // v1.0.4 FIX: Call plan() to re-calculate with new category
+            // plan() will trigger render() after recalculating
+            if (typeof window.plan === "function") {
+                await window.plan();
+            } else if (typeof window.render === "function") {
+                // Fallback to render if plan not available
                 window.render();
             }
         };

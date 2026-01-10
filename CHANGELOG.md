@@ -28,3 +28,15 @@
 - Container classification (apps, games, system)
 - Policy enforcement with user opt-in
 - Snapshot and rollback functionality
+
+## [1.0.4] - 2025-01-10
+
+### Fixed
+- Category dropdown now auto-refreshes page after selection (was requiring manual tab switch)
+- No-port containers with category override now move to Standardized tab correctly
+- binhex-plexpass and similar host-network containers handled properly
+
+### Improved
+- Standardized tab: Legend now horizontal/compact single row
+- Standardized tab: Progress bar now horizontal single row  
+- Standardized tab: Restored sub-tabs (All | Apps | Games | System | Excluded)

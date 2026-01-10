@@ -1,6 +1,6 @@
 {
   "name": "port-mcp-enforcer",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Docker port management UI for Port-MCP",
   "type": "commonjs",
   "main": "src/ui/web/server.js",

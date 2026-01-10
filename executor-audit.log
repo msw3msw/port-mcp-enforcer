@@ -1,2 +1,8 @@
 {"time":1767332988073,"status":"success","actions":[],"results":[]}
 {"time":1767333007761,"status":"success","actions":[],"results":[]}
+{"time":1767563451869,"status":"success","actions":[],"results":[]}
+{"time":1767563525637,"status":"success","actions":[],"results":[]}
+{"time":1767563728880,"status":"success","actions":[],"results":[]}
+{"time":1767564108286,"status":"success","actions":[],"results":[]}
+{"time":1767564785800,"status":"success","actions":[],"results":[]}
+{"time":1767565114892,"status":"success","actions":[{"type":"update-container-ports","container":"Icarus","from":[{"host":17777,"container":17777,"protocol":"udp"},{"host":27015,"container":27015,"protocol":"udp"}],"to":[{"host":20000,"container":17777,"protocol":"udp"},{"host":27017,"container":27015,"protocol":"udp"}],"reason":"Port change via impact modal"}],"results":[{"action":"update-container-ports","container":"Icarus","result":{"status":"success","container":"Icarus"}}]}
